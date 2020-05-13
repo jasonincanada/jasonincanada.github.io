@@ -1,4 +1,3 @@
 
-Source for my [developer story / portfolio projects](https://jasonincanada.github.io/)
-site on GitHub Pages
+Source for my developer story / portfolio projects site on GitHub Pages: https://jasonincanada.github.io/
 
