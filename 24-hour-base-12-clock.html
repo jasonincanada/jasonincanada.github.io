@@ -153,11 +153,35 @@
         .digital-time {
             fill: var(--ink);
             font-family: "Cambria Math", "STIX Two Math", "Segoe UI Symbol", monospace;
-            font-size: 18px;
+            font-size: 17px;
             font-variant-numeric: tabular-nums;
             text-anchor: middle;
             dominant-baseline: middle;
             letter-spacing: 0.05em;
+        }
+
+        .standard-time {
+            fill: var(--ink);
+            font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        .digital-kind {
+            fill: #56615b;
+            font-family: system-ui, sans-serif;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        .digital-divider {
+            stroke: rgba(139, 107, 53, 0.45);
+            stroke-width: 1;
         }
 
         .hand {
@@ -230,7 +254,8 @@
                 <g id="graduations" aria-hidden="true"></g>
                 <g id="numerals" aria-hidden="true"></g>
 
-                <text class="dial-title" x="300" y="218">TWENTY-FOUR HOUR</text>
+                <text class="dial-title" x="300" y="218">FULL-DAY CLOCK</text>
+                <text class="dial-note" x="300" y="234">NOON ON TOP</text>
 
                 <g id="hour-hand" class="hand">
                     <path class="hour-hand" d="M 292 315 L 294 174 Q 300 160 306 174 L 308 315 Z"/>
@@ -239,11 +264,14 @@
                     <path class="minute-hand" d="M 295 321 L 297 122 Q 300 110 303 122 L 305 321 Z"/>
                 </g>
 
-                <g aria-label="Digital dozenal time">
-                    <rect class="digital-window" x="244" y="376" width="112" height="34" rx="4"/>
-                    <text id="digital-time" class="digital-time" x="300" y="394">00:00:00</text>
+                <g aria-label="Dozenal and standard digital time">
+                    <rect class="digital-window" x="225" y="376" width="150" height="56" rx="4"/>
+                    <line class="digital-divider" x1="231" y1="404" x2="369" y2="404"/>
+                    <text id="digital-time" class="digital-time" x="286" y="391">00:00:00</text>
+                    <text class="digital-kind" x="350" y="391">DOZENAL</text>
+                    <text id="standard-time" class="standard-time" x="286" y="418">12:00:00 AM</text>
+                    <text class="digital-kind" x="350" y="418">STANDARD</text>
                 </g>
-                <text class="dial-note" x="300" y="426">DOZENAL TIME</text>
 
                 <g id="second-hand" class="hand">
                     <path class="second-hand" d="M 297.5 345 L 299 88 Q 300 81 301 88 L 302.5 345 Z"/>
@@ -272,6 +300,7 @@
         const minuteHand = document.getElementById("minute-hand");
         const secondHand = document.getElementById("second-hand");
         const digitalTime = document.getElementById("digital-time");
+        const standardTime = document.getElementById("standard-time");
 
         // Twenty-four sectors × twelve intervals gives 288 positions.
         for (let index = 0; index < 288; index += 1) {
@@ -329,13 +358,21 @@
             // 72 movements per minute makes each dozenal second 5/6 standard second.
             // Each movement spans four of the dial's 288 graduations.
             const dozenalSecond = Math.floor(seconds * 72 / 60);
-            setHandAngle(secondHand, dozenalSecond * 360 / 72);
-            setHandAngle(minuteHand, minutes * 6);
+            // Start each minute at the bottom of the dial.
+            setHandAngle(secondHand, 180 + dozenalSecond * 360 / 72);
+            // Start each hour at the bottom of the dial as well.
+            setHandAngle(minuteHand, 180 + minutes * 6);
             digitalTime.textContent = [
                 twoDigitDozenal(now.getHours()),
                 twoDigitDozenal(now.getMinutes()),
                 twoDigitDozenal(dozenalSecond)
             ].join(":");
+            const standardHour = now.getHours() % 12 || 12;
+            standardTime.textContent = [
+                standardHour,
+                String(now.getMinutes()).padStart(2, "0"),
+                String(now.getSeconds()).padStart(2, "0")
+            ].join(":") + (now.getHours() < 12 ? " AM" : " PM");
 
             // Offset by noon so 12:00 points up and 00:00 points down.
             setHandAngle(hourHand, ((hours - 12 + 24) % 24) * 15);
