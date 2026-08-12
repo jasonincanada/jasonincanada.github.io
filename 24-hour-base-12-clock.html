@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A 24-hour analog clock with twelve graduations per hour and dozenal numerals.">
+    <title>Base-12 · 24-Hour Analog Clock</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #17211f;
+            --paper: #f2ead8;
+            --brass: #b8883f;
+            --brass-light: #e1bd76;
+            --red: #b9473f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 50% 35%, rgba(68, 94, 82, 0.78), transparent 38rem),
+                linear-gradient(145deg, #172723, #08100f 72%);
+            color: #f5eedf;
+            font-family: Georgia, "Times New Roman", serif;
+        }
+
+        main {
+            width: min(94vw, 47rem);
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 0.3rem;
+            font-size: clamp(1.5rem, 4vw, 2.4rem);
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .dek {
+            color: var(--brass-light);
+        }
+
+        .subtitle {
+            margin: 0 0 1.4rem;
+            color: #cbbfa8;
+            font-family: system-ui, sans-serif;
+            font-size: clamp(0.75rem, 2vw, 0.9rem);
+            letter-spacing: 0.08em;
+        }
+
+        .clock-shell {
+            position: relative;
+            width: min(84vw, 38rem);
+            margin-inline: auto;
+            padding: clamp(0.55rem, 2vw, 0.9rem);
+            border: 1px solid #e2c27e;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e4c177 0%, #715024 22%, #d9b269 47%, #68471f 74%, #d5ad62 100%);
+            box-shadow:
+                0 1.8rem 4rem rgba(0, 0, 0, 0.5),
+                inset 0 0 0 0.15rem rgba(255, 244, 200, 0.25),
+                inset 0 0 1.2rem rgba(0, 0, 0, 0.7);
+        }
+
+        .clock-shell::before {
+            content: "";
+            position: absolute;
+            inset: 2.5%;
+            z-index: 2;
+            pointer-events: none;
+            border-radius: 50%;
+            background: linear-gradient(125deg, rgba(255, 255, 255, 0.18), transparent 28%, transparent 72%, rgba(255, 255, 255, 0.07));
+        }
+
+        svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 50%;
+            background: var(--paper);
+            box-shadow: inset 0 0 2.4rem rgba(52, 39, 19, 0.42);
+        }
+
+        .minor-tick,
+        .third-tick,
+        .major-tick {
+            stroke: var(--ink);
+            vector-effect: non-scaling-stroke;
+        }
+
+        .minor-tick {
+            stroke-width: 0.8;
+            opacity: 0.45;
+        }
+
+        .third-tick {
+            stroke-width: 1.5;
+            opacity: 0.68;
+        }
+
+        .major-tick {
+            stroke-width: 3.2;
+            stroke-linecap: round;
+        }
+
+        .numeral {
+            fill: var(--ink);
+            font-family: "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans", sans-serif;
+            font-size: 22px;
+            font-weight: 600;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        .numeral.dek-symbol {
+            font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+            font-weight: 400;
+        }
+
+        .dial-title,
+        .dial-note {
+            fill: #56615b;
+            font-family: system-ui, sans-serif;
+            text-anchor: middle;
+            letter-spacing: 0.24em;
+        }
+
+        .dial-title {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .dial-note {
+            font-size: 9px;
+        }
+
+        .digital-window {
+            fill: rgba(226, 214, 190, 0.88);
+            stroke: #8b6b35;
+            stroke-width: 1.5;
+        }
+
+        .digital-time {
+            fill: var(--ink);
+            font-family: "Cambria Math", "STIX Two Math", "Segoe UI Symbol", monospace;
+            font-size: 18px;
+            font-variant-numeric: tabular-nums;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            letter-spacing: 0.05em;
+        }
+
+        .hand {
+            transform-origin: 300px 300px;
+            will-change: transform;
+        }
+
+        .hour-hand,
+        .minute-hand {
+            fill: var(--ink);
+            filter: drop-shadow(2px 3px 2px rgba(0, 0, 0, 0.22));
+        }
+
+        .second-hand {
+            fill: var(--red);
+            filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, 0.2));
+        }
+
+        .pin-ring {
+            fill: var(--brass);
+            stroke: var(--ink);
+            stroke-width: 3;
+        }
+
+        .pin {
+            fill: var(--ink);
+        }
+
+        .legend {
+            margin: 1.25rem auto 0;
+            color: #cbbfa8;
+            font-family: system-ui, sans-serif;
+            font-size: 0.82rem;
+            line-height: 1.55;
+        }
+
+        .legend strong {
+            color: #f4dfb5;
+            font-weight: 600;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hand {
+                will-change: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Base-<span class="dek">12</span> · 24-Hour Clock</h1>
+        <p class="subtitle">This dozenal “second” is 5⁄6 of a standard second</p>
+
+        <div class="clock-shell">
+            <svg id="clock" viewBox="0 0 600 600" role="img" aria-labelledby="clock-title clock-description">
+                <title id="clock-title">Base-12 24-hour analog clock</title>
+                <desc id="clock-description">A working 24-hour analog clock with noon at the top, twelve graduations per hour, and a digital dozenal time display.</desc>
+
+                <defs>
+                    <radialGradient id="dial" cx="43%" cy="36%" r="68%">
+                        <stop offset="0" stop-color="#fffaf0"/>
+                        <stop offset="0.72" stop-color="#f2ead8"/>
+                        <stop offset="1" stop-color="#d8cbae"/>
+                    </radialGradient>
+                </defs>
+
+                <circle cx="300" cy="300" r="292" fill="url(#dial)"/>
+                <circle cx="300" cy="300" r="278" fill="none" stroke="#8b6b35" stroke-width="2"/>
+
+                <g id="graduations" aria-hidden="true"></g>
+                <g id="numerals" aria-hidden="true"></g>
+
+                <text class="dial-title" x="300" y="218">TWENTY-FOUR HOUR</text>
+
+                <g id="hour-hand" class="hand">
+                    <path class="hour-hand" d="M 292 315 L 294 174 Q 300 160 306 174 L 308 315 Z"/>
+                </g>
+                <g id="minute-hand" class="hand">
+                    <path class="minute-hand" d="M 295 321 L 297 122 Q 300 110 303 122 L 305 321 Z"/>
+                </g>
+
+                <g aria-label="Digital dozenal time">
+                    <rect class="digital-window" x="244" y="376" width="112" height="34" rx="4"/>
+                    <text id="digital-time" class="digital-time" x="300" y="394">00:00:00</text>
+                </g>
+                <text class="dial-note" x="300" y="426">DOZENAL TIME</text>
+
+                <g id="second-hand" class="hand">
+                    <path class="second-hand" d="M 297.5 345 L 299 88 Q 300 81 301 88 L 302.5 345 Z"/>
+                    <circle cx="300" cy="371" r="13" fill="none" stroke="#b9473f" stroke-width="5"/>
+                </g>
+
+                <circle class="pin-ring" cx="300" cy="300" r="15"/>
+                <circle class="pin" cx="300" cy="300" r="6"/>
+            </svg>
+        </div>
+
+        <p class="legend">
+            <strong>&#x1D4B3; = dek (ten)</strong> · <strong>&#x218B; = el (eleven)</strong> · <strong>10 = twelve</strong><br>
+            Noon is at the top; the hour hand completes one revolution per day.
+        </p>
+    </main>
+
+    <script>
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const center = 300;
+        const DEK = "\u{1D4B3}";
+        const EL = "\u218B";
+        const graduationLayer = document.getElementById("graduations");
+        const numeralLayer = document.getElementById("numerals");
+        const hourHand = document.getElementById("hour-hand");
+        const minuteHand = document.getElementById("minute-hand");
+        const secondHand = document.getElementById("second-hand");
+        const digitalTime = document.getElementById("digital-time");
+
+        // Twenty-four sectors × twelve intervals gives 288 positions.
+        for (let index = 0; index < 288; index += 1) {
+            const tick = document.createElementNS(SVG_NS, "line");
+            const isMajor = index % 12 === 0;
+            const subdivision = index % 12;
+            const isThird = subdivision === 4 || subdivision === 8;
+
+            tick.setAttribute("x1", center);
+            tick.setAttribute("x2", center);
+            tick.setAttribute("y1", isMajor ? 34 : isThird ? 39 : 43);
+            tick.setAttribute("y2", isMajor ? 63 : isThird ? 58 : 53);
+            tick.setAttribute("transform", `rotate(${index * 1.25} ${center} ${center})`);
+            tick.setAttribute("class", isMajor ? "major-tick" : isThird ? "third-tick" : "minor-tick");
+            graduationLayer.appendChild(tick);
+        }
+
+        const dozenalDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", DEK, EL];
+
+        function toDozenal(number) {
+            if (number < 12) return dozenalDigits[number];
+            return dozenalDigits[Math.floor(number / 12)] + dozenalDigits[number % 12];
+        }
+
+        function twoDigitDozenal(number) {
+            return toDozenal(number).padStart(2, "0");
+        }
+
+        // The dial runs noon → midnight → noon, placing decimal 12 (dozenal 10) on top.
+        for (let index = 0; index < 24; index += 1) {
+            const hour = index <= 12 ? 12 + index : index - 12;
+            const label = toDozenal(hour);
+            const angle = index * Math.PI / 12 - Math.PI / 2;
+            const numeral = document.createElementNS(SVG_NS, "text");
+
+            numeral.setAttribute("x", center + Math.cos(angle) * 220);
+            numeral.setAttribute("y", center + Math.sin(angle) * 220 + 1);
+            numeral.setAttribute("class", "numeral");
+            if (label.includes(DEK)) numeral.classList.add("dek-symbol");
+            numeral.textContent = label;
+            numeralLayer.appendChild(numeral);
+        }
+
+        function setHandAngle(hand, degrees) {
+            hand.style.transform = `rotate(${degrees}deg)`;
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const milliseconds = now.getMilliseconds();
+            const seconds = now.getSeconds() + milliseconds / 1000;
+            const minutes = now.getMinutes() + seconds / 60;
+            const hours = now.getHours() + minutes / 60;
+
+            // 72 movements per minute makes each dozenal second 5/6 standard second.
+            // Each movement spans four of the dial's 288 graduations.
+            const dozenalSecond = Math.floor(seconds * 72 / 60);
+            setHandAngle(secondHand, dozenalSecond * 360 / 72);
+            setHandAngle(minuteHand, minutes * 6);
+            digitalTime.textContent = [
+                twoDigitDozenal(now.getHours()),
+                twoDigitDozenal(now.getMinutes()),
+                twoDigitDozenal(dozenalSecond)
+            ].join(":");
+
+            // Offset by noon so 12:00 points up and 00:00 points down.
+            setHandAngle(hourHand, ((hours - 12 + 24) % 24) * 15);
+
+            requestAnimationFrame(updateClock);
+        }
+
+        updateClock();
+    </script>
+</body>
+</html>
