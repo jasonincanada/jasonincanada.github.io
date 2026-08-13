@@ -152,6 +152,18 @@
             opacity: 0.82;
         }
 
+        .minute-label.guide-label {
+            fill: #7b8380;
+            font-size: 9px;
+            font-weight: 500;
+            opacity: 0.68;
+        }
+
+        .workday-wedge {
+            fill: #c8d5ae;
+            opacity: 0.38;
+        }
+
         .dial-title,
         .dial-note {
             fill: #56615b;
@@ -170,21 +182,13 @@
         }
 
         .digital-window {
-            fill: #c7cecc;
-        }
-
-        .digital-recess-top {
-            fill: url(#digital-recess-top);
-        }
-
-        .digital-recess-left {
-            fill: url(#digital-recess-left);
+            fill: rgba(199, 206, 204, 0.86);
         }
 
         .digital-time {
             fill: var(--ink);
             font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Cambria Math", monospace;
-            font-size: 16px;
+            font-size: 15px;
             font-variant-numeric: tabular-nums;
             text-anchor: middle;
             dominant-baseline: middle;
@@ -194,7 +198,7 @@
         .standard-time {
             fill: var(--ink);
             font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
-            font-size: 13px;
+            font-size: 12px;
             font-variant-numeric: tabular-nums;
             text-anchor: middle;
             dominant-baseline: middle;
@@ -203,7 +207,7 @@
         .digital-kind {
             fill: #53605f;
             font-family: system-ui, sans-serif;
-            font-size: 6px;
+            font-size: 5.5px;
             font-weight: 700;
             letter-spacing: 0.08em;
             text-anchor: middle;
@@ -250,8 +254,42 @@
         }
 
         .legend strong {
+            display: block;
             color: #f4dfb5;
             font-weight: 600;
+        }
+
+        .legend code {
+            display: inline-block;
+            padding: 0.08em 0.38em;
+            border-radius: 0.28rem;
+            background: rgba(4, 10, 9, 0.52);
+            color: #ffe6ad;
+            font-family: "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+            font-size: 0.92em;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            text-decoration: underline;
+            text-decoration-color: rgba(255, 230, 173, 0.38);
+            text-decoration-thickness: 1px;
+            text-underline-offset: 0.22em;
+        }
+
+        .legend a {
+            border-radius: 0.28rem;
+            text-decoration: none;
+        }
+
+        .legend a:hover code,
+        .legend a:focus-visible code {
+            background: rgba(4, 10, 9, 0.82);
+            color: #fff3d5;
+            text-decoration-color: rgba(255, 243, 213, 0.78);
+        }
+
+        .legend a:focus-visible {
+            outline: 2px solid rgba(225, 189, 118, 0.65);
+            outline-offset: 3px;
         }
 
         .info-button {
@@ -341,20 +379,10 @@
                         <stop offset="0.72" stop-color="#f2ead8"/>
                         <stop offset="1" stop-color="#d8cbae"/>
                     </radialGradient>
-                    <linearGradient id="digital-recess-top" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stop-color="#35413f" stop-opacity="0.28"/>
-                        <stop offset="1" stop-color="#35413f" stop-opacity="0"/>
-                    </linearGradient>
-                    <linearGradient id="digital-recess-left" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#35413f" stop-opacity="0.24"/>
-                        <stop offset="1" stop-color="#35413f" stop-opacity="0"/>
-                    </linearGradient>
-                    <clipPath id="digital-window-clip">
-                        <rect x="225" y="376" width="150" height="56" rx="2"/>
-                    </clipPath>
                 </defs>
 
                 <circle cx="300" cy="300" r="292" fill="url(#dial)"/>
+                <path id="workday-wedge" class="workday-wedge" aria-hidden="true"/>
                 <circle cx="300" cy="300" r="278" fill="none" stroke="#8b6b35" stroke-width="2"/>
 
                 <g id="graduations" aria-hidden="true"></g>
@@ -377,16 +405,12 @@
                 </g>
 
                 <g aria-label="Dozenal and standard digital time">
-                    <rect class="digital-window" x="225" y="376" width="150" height="56" rx="2"/>
-                    <g clip-path="url(#digital-window-clip)" aria-hidden="true">
-                        <rect class="digital-recess-top" x="225" y="376" width="150" height="5"/>
-                        <rect class="digital-recess-left" x="225" y="376" width="5" height="56"/>
-                    </g>
-                    <line class="digital-divider" x1="231" y1="404" x2="369" y2="404"/>
-                    <text id="digital-time" class="digital-time" x="286" y="391">00:00:00</text>
-                    <text class="digital-kind" x="350" y="391">DOZENAL</text>
-                    <text id="standard-time" class="standard-time" x="286" y="418">12:00:00 AM</text>
-                    <text class="digital-kind" x="350" y="418">STANDARD</text>
+                    <rect class="digital-window" x="233" y="369" width="134" height="49" rx="2"/>
+                    <line class="digital-divider" x1="239" y1="393.5" x2="361" y2="393.5"/>
+                    <text id="digital-time" class="digital-time" x="283" y="381.5">00:00:00</text>
+                    <text class="digital-kind" x="345" y="381.5">DOZENAL</text>
+                    <text id="standard-time" class="standard-time" x="283" y="406.5">12:00:00 AM</text>
+                    <text class="digital-kind" x="345" y="406.5">STANDARD</text>
                 </g>
 
                 <g id="second-hand" class="hand">
@@ -406,11 +430,14 @@
             <button class="dialog-close" value="close" aria-label="Close information">&times;</button>
         </form>
         <h1 id="info-title">Base-<span class="dek">12</span> · 24-Hour Clock</h1>
-        <p class="subtitle">This dozenal “second” is 5⁄6 of a standard second</p>
+        <p class="subtitle">The dozenal “second” is 5⁄6 of a standard second<br/>(72 per minute)</p>
         <p class="legend">
-            <strong>X = dek (ten)</strong> · <strong>E = el (eleven)</strong> · <strong>10 = twelve</strong><br>
+            <strong>X = dek (ten)</strong>
+            <strong>E = el (eleven)</strong>
+            <strong>10 = twelve</strong><br>
             Noon is at the top; the hour hand completes one revolution per day.<br>
-            The subtle inner ring is the 60-minute scale, numbered in dozenal from the bottom.
+            The subtle inner ring is the 60-minute scale, numbered in dozenal.<br>
+            Set the standard-time workday with <a id="sample-workday-link" href="#workday=08:00-16:30"><code>#workday=08:00-16:30</code></a> in the URL.
         </p>
     </dialog>
 
@@ -424,6 +451,7 @@
         const numeralLayer = document.getElementById("numerals");
         const minuteGraduationLayer = document.getElementById("minute-graduations");
         const minuteLabelLayer = document.getElementById("minute-labels");
+        const workdayWedge = document.getElementById("workday-wedge");
         const hourHand = document.getElementById("hour-hand");
         const minuteHand = document.getElementById("minute-hand");
         const secondHand = document.getElementById("second-hand");
@@ -431,13 +459,50 @@
         const standardTime = document.getElementById("standard-time");
         const infoButton = document.getElementById("info-button");
         const infoDialog = document.getElementById("info-dialog");
+        const sampleWorkdayLink = document.getElementById("sample-workday-link");
 
         infoButton.addEventListener("click", () => infoDialog.showModal());
+        sampleWorkdayLink.addEventListener("click", () => infoDialog.close());
         infoDialog.addEventListener("click", (event) => {
             if (event.target === infoDialog) infoDialog.close();
         });
 
         // Twenty-four sectors × twelve intervals gives 288 positions.
+        function workdayPoint(totalMinutes, radius = 278) {
+            const angle = (totalMinutes - 12 * 60) / (24 * 60) * Math.PI * 2;
+            return {
+                x: center + Math.sin(angle) * radius,
+                y: center - Math.cos(angle) * radius
+            };
+        }
+
+        function renderWorkday() {
+            const params = new URLSearchParams(window.location.hash.slice(1));
+            const range = params.get("workday");
+            const match = range?.match(/^([01]?\d|2[0-3]):([0-5]\d)-([01]?\d|2[0-3]):([0-5]\d)$/);
+
+            if (!match) {
+                workdayWedge.removeAttribute("d");
+                return;
+            }
+
+            const startMinutes = Number(match[1]) * 60 + Number(match[2]);
+            const endMinutes = Number(match[3]) * 60 + Number(match[4]);
+            const duration = (endMinutes - startMinutes + 24 * 60) % (24 * 60);
+            const start = workdayPoint(startMinutes);
+            const end = workdayPoint(endMinutes);
+            const largeArc = duration > 12 * 60 ? 1 : 0;
+
+            workdayWedge.setAttribute(
+                "d",
+                `M ${center} ${center} L ${start.x.toFixed(2)} ${start.y.toFixed(2)} ` +
+                `A 278 278 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)} Z`
+            );
+        }
+
+        window.addEventListener("hashchange", renderWorkday);
+        renderWorkday();
+
         for (let index = 0; index < 288; index += 1) {
             const tick = document.createElementNS(SVG_NS, "line");
             const isMajor = index % 12 === 0;
@@ -489,6 +554,18 @@
             label.textContent = toDozenal(minute === 0 ? 60 : minute);
             minuteLabelLayer.appendChild(label);
         }
+
+        // Show the dozenal digit transition without competing with the main labels.
+        [7, 8, 9, 10, 11].forEach((minute) => {
+            const angle = (180 + minute * 6) * Math.PI / 180 - Math.PI / 2;
+            const label = document.createElementNS(SVG_NS, "text");
+
+            label.setAttribute("x", center + Math.cos(angle) * 163);
+            label.setAttribute("y", center + Math.sin(angle) * 163 + 1);
+            label.setAttribute("class", "minute-label guide-label");
+            label.textContent = toDozenal(minute);
+            minuteLabelLayer.appendChild(label);
+        });
 
         // The dial runs noon → midnight → noon, placing decimal 12 (dozenal 10) on top.
         for (let index = 0; index < 24; index += 1) {
