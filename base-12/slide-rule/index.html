@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#091b2c">
+  <meta name="description" content="A tactile, interactive base-12 slide rule inspired by classic Keuffel & Esser instruments.">
+  <title>Radix XII — Base-12 Slide Rule</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #111923;
+      --paper: #edf3f5;
+      --red: #c83d43;
+      --steel: #8eb2cb;
+      --field: #091b2c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: #061321; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #e7eef3;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(61, 118, 157, .27), transparent 42rem),
+        linear-gradient(135deg, rgba(255,255,255,.018) 25%, transparent 25%) 0 0 / 12px 12px,
+        var(--field);
+    }
+
+    main {
+      width: min(1600px, 100%);
+      margin: 0 auto;
+      padding: clamp(28px, 5vw, 68px) clamp(16px, 4vw, 64px) 40px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 28px;
+      margin: 0 auto 28px;
+      max-width: 1400px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #f4f8fb;
+      font: 600 clamp(32px, 4.5vw, 56px)/1 "Bahnschrift Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+      letter-spacing: .055em;
+      text-transform: uppercase;
+    }
+
+    h1 span {
+      margin-left: .08em;
+      color: #8fc0dc;
+      font-style: normal;
+      font-weight: 300;
+      letter-spacing: .09em;
+    }
+
+    .lede {
+      max-width: 620px;
+      margin: 13px 0 0;
+      color: #a9bdca;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .base-key {
+      display: flex;
+      gap: 18px;
+      padding: 12px 0 5px;
+      color: #9db3c1;
+      font: 600 12px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    .base-key b { color: #ef6269; font-size: 17px; }
+
+    .instrument-shell {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(129, 181, 216, .38);
+      border-radius: 16px;
+      background: #061321;
+      box-shadow: 0 32px 80px rgba(0,0,0,.42), inset 0 1px rgba(255,255,255,.09), 0 0 0 1px rgba(28, 79, 112, .2);
+    }
+
+    .instrument-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.035) 38%, transparent 56%);
+      z-index: 2;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 280px;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      max-width: 1400px;
+      margin: 18px auto 0;
+    }
+
+    .readout {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: hidden;
+      border: 1px solid rgba(129, 181, 216, .26);
+      border-radius: 9px;
+      background: rgba(3, 13, 24, .52);
+    }
+
+    .reading { padding: 11px 16px 12px; border-right: 1px solid rgba(129, 181, 216, .16); }
+    .reading:last-child { border: 0; }
+    .reading span { display: block; margin-bottom: 5px; color: #7896a9; font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .reading output { color: #edf5f8; font: 600 15px/1 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .reading.result output { color: #f05a61; }
+
+    .button-row { display: flex; gap: 8px; }
+
+    button {
+      border: 1px solid rgba(129, 181, 216, .3);
+      border-radius: 7px;
+      padding: 10px 14px;
+      color: #dce8ee;
+      background: rgba(6, 25, 42, .72);
+      font: 700 10px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .1s;
+    }
+
+    button:hover { border-color: rgba(91, 174, 226, .72); background: rgba(17, 53, 78, .95); }
+    button:active { transform: translateY(1px); }
+    button:focus-visible { outline: 2px solid #e4545b; outline-offset: 3px; }
+
+    .help {
+      max-width: 1400px;
+      margin: 14px auto 0;
+      color: #758f9f;
+      font: 11px/1.6 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+
+    .help strong { color: #88bddc; font-weight: 700; }
+
+    .info-button {
+      position: fixed;
+      top: clamp(11px, 2vw, 18px);
+      right: clamp(11px, 2vw, 18px);
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid rgba(137, 193, 228, .72);
+      border-radius: 50%;
+      color: #d9edf7;
+      background: rgba(7, 28, 46, .92);
+      box-shadow: 0 7px 20px rgba(0, 0, 0, .32);
+      font: 700 17px/1 "Bahnschrift Condensed", "Arial Narrow", Arial, sans-serif;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .info-button:hover,
+    .info-button:focus-visible {
+      border-color: #b5d9ec;
+      color: #fff;
+      background: #123a55;
+      outline: 2px solid rgba(105, 177, 221, .45);
+      outline-offset: 3px;
+    }
+
+    .info-dialog {
+      width: min(92vw, 680px);
+      max-height: min(88vh, 760px);
+      overflow: auto;
+      padding: clamp(24px, 5vw, 38px);
+      border: 1px solid rgba(126, 181, 215, .68);
+      border-radius: 14px;
+      color: #dfeaf0;
+      background: #0a2032;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, .58), inset 0 1px rgba(255, 255, 255, .06);
+    }
+
+    .info-dialog::backdrop {
+      background: rgba(2, 10, 18, .78);
+      backdrop-filter: blur(4px);
+    }
+
+    .info-dialog form { margin: 0; }
+
+    .dialog-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: #8fb0c3;
+      background: transparent;
+      font: 400 25px/1 system-ui, sans-serif;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .dialog-close:hover,
+    .dialog-close:focus-visible {
+      border: 1px solid rgba(128, 183, 216, .55);
+      color: #fff;
+      background: rgba(36, 76, 103, .45);
+      outline: none;
+    }
+
+    .dialog-kicker {
+      margin: 0 0 7px;
+      color: #ef6269;
+      font: 700 10px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    .info-dialog h2 {
+      margin: 0;
+      color: #f4f8fa;
+      font: 500 clamp(25px, 5vw, 34px)/1.05 "Bahnschrift Condensed", "Arial Narrow", Arial, sans-serif;
+      letter-spacing: .01em;
+    }
+
+    .dialog-intro {
+      margin: 10px 0 22px;
+      color: #9eb7c5;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .scale-legend { margin: 0; }
+
+    .scale-legend > div {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 11px 0;
+      border-top: 1px solid rgba(126, 181, 215, .14);
+    }
+
+    .scale-legend dt {
+      display: grid;
+      place-items: center;
+      min-height: 28px;
+      margin: 0;
+      border: 1px solid rgba(126, 181, 215, .4);
+      border-radius: 4px;
+      color: #edf6fa;
+      background: #14344b;
+      font: 700 12px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+
+    .scale-legend .inverse dt { border-color: rgba(224, 94, 102, .58); color: #f27a80; }
+
+    .scale-legend dd {
+      margin: 0;
+      color: #a9bdc9;
+      font-size: 12px;
+      line-height: 1.48;
+    }
+
+    .scale-legend dd strong { color: #eef4f7; font-weight: 700; }
+
+    .dialog-note {
+      margin: 18px 0 0;
+      padding-top: 15px;
+      border-top: 1px solid rgba(126, 181, 215, .2);
+      color: #86a5b7;
+      font: 11px/1.55 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+
+    .dialog-note b { color: #dcebf2; }
+
+    @media (max-width: 760px) {
+      header, .controls { grid-template-columns: 1fr; align-items: start; }
+      .base-key { padding-top: 0; }
+      .controls { gap: 12px; }
+      .button-row { justify-content: flex-start; }
+      .reading { padding-inline: 11px; }
+      svg { width: 1220px; max-width: none; }
+      .instrument-shell { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <button id="infoButton" class="info-button" type="button" aria-label="Open scale legend" aria-haspopup="dialog">?</button>
+
+  <main>
+    <header>
+      <div>
+        <h1>Radix <span>XII</span></h1>
+        <p class="lede">A logarithmic slide rule recut for dozenal arithmetic. Align the C index with a value on D, move the hairline to a multiplier on C, and read the product below on D.</p>
+      </div>
+      <div class="base-key" aria-label="Dozenal digit key">
+        <span><b>X</b> = dek</span>
+        <span><b>E</b> = el</span>
+        <span><b>10</b> = twelve</span>
+      </div>
+    </header>
+
+    <section class="instrument-shell" aria-label="Interactive base-12 slide rule">
+      <svg id="rule" viewBox="0 0 1600 430" role="img" aria-labelledby="ruleTitle ruleDesc" tabindex="0">
+        <title id="ruleTitle">Radix XII base-12 slide rule</title>
+        <desc id="ruleDesc">A seven-scale slide rule with K, A, B, inverse CI, C, D, and L scales. K reads cubes, CI reads reciprocals, and L reads base-12 logarithms. Drag the center slide and transparent cursor to calculate in base twelve.</desc>
+        <defs>
+          <linearGradient id="metal" x1="0" x2="1">
+            <stop offset="0" stop-color="#243646"/>
+            <stop offset=".18" stop-color="#a6bcc9"/>
+            <stop offset=".36" stop-color="#344b5d"/>
+            <stop offset=".72" stop-color="#bed0d9"/>
+            <stop offset="1" stop-color="#1b2c3a"/>
+          </linearGradient>
+          <linearGradient id="glass" x1="0" x2="1">
+            <stop offset="0" stop-color="#d7efff" stop-opacity=".09"/>
+            <stop offset=".48" stop-color="#fff" stop-opacity=".2"/>
+            <stop offset=".62" stop-color="#c7e6f7" stop-opacity=".07"/>
+            <stop offset="1" stop-color="#fff" stop-opacity=".13"/>
+          </linearGradient>
+          <filter id="ruleShadow" x="-20%" y="-40%" width="140%" height="190%">
+            <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity=".52"/>
+          </filter>
+          <filter id="cursorShadow" x="-100%" y="-20%" width="300%" height="150%">
+            <feDropShadow dx="3" dy="5" stdDeviation="4" flood-color="#000" flood-opacity=".36"/>
+          </filter>
+          <pattern id="grain" width="47" height="31" patternUnits="userSpaceOnUse">
+            <circle cx="7" cy="9" r=".55" fill="#536873" opacity=".2"/>
+            <circle cx="31" cy="24" r=".45" fill="#fff" opacity=".3"/>
+            <path d="M14 4l7 .3M38 12l5-.2M3 27l9 .2" stroke="#657b87" stroke-width=".35" opacity=".16"/>
+          </pattern>
+          <clipPath id="bodyClip"><rect x="60" y="48" width="1480" height="334" rx="8"/></clipPath>
+        </defs>
+
+        <rect width="1600" height="430" fill="#061321"/>
+        <g opacity=".22" stroke="#6194b5" stroke-width="1">
+          <path d="M0 30H1600M0 400H1600"/><path d="M30 0V430M1570 0V430"/>
+        </g>
+
+        <g filter="url(#ruleShadow)">
+          <rect x="60" y="48" width="1480" height="334" rx="8" fill="#e1e9ed" stroke="#718b99" stroke-width="2"/>
+          <rect x="65" y="53" width="1470" height="324" rx="5" fill="url(#grain)" opacity=".62"/>
+          <rect x="65" y="169" width="1470" height="99" fill="#061321"/>
+          <g id="scaleK"></g>
+          <g id="scaleA"></g>
+          <g id="scaleD"></g>
+          <g id="scaleL"></g>
+
+          <g id="slide" class="drag-slide" style="cursor: ew-resize">
+            <rect x="65" y="169" width="1470" height="99" fill="#fbfdfe"/>
+            <rect x="65" y="170" width="1470" height="97" fill="url(#grain)" opacity=".24"/>
+            <path d="M65 169V268M1535 169V268" stroke="#6b8593" stroke-width="1.5"/>
+            <g id="scaleB"></g>
+            <g id="scaleCI"></g>
+            <g id="scaleC"></g>
+          </g>
+
+          <g fill="url(#metal)" stroke="#292923" stroke-width="1.5">
+            <rect x="58" y="42" width="38" height="346" rx="7"/>
+            <rect x="1504" y="42" width="38" height="346" rx="7"/>
+          </g>
+          <g fill="#253b4b" stroke="#b6cbd6" stroke-width="1">
+            <circle cx="77" cy="79" r="8"/><circle cx="77" cy="351" r="8"/>
+            <circle cx="1523" cy="79" r="8"/><circle cx="1523" cy="351" r="8"/>
+          </g>
+          <g stroke="#151713" stroke-width="1.5">
+            <path d="M72 79h10M77 74v10M72 351h10M77 346v10M1518 79h10M1523 74v10M1518 351h10M1523 346v10" stroke="#0b1822"/>
+          </g>
+        </g>
+
+        <g id="cursor" filter="url(#cursorShadow)" style="cursor: ew-resize">
+          <rect x="-26" y="31" width="52" height="368" rx="7" fill="url(#glass)" stroke="#a8c7d8" stroke-width="2"/>
+          <path d="M0 42V389" stroke="#247fa8" stroke-width="2"/>
+          <path d="M-10 42H10M-10 389H10" stroke="#247fa8" stroke-width="1.5"/>
+          <rect class="cursor-handle" x="-38" y="19" width="76" height="30" rx="8" fill="#17354a" stroke="#aac8d7" stroke-width="2"/>
+          <path d="M-19 34H19" stroke="#d7e6ed" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      </svg>
+    </section>
+
+    <div class="controls">
+      <div class="readout" aria-live="polite">
+        <div class="reading"><span>D · multiplicand</span><output id="multiplicand">1.000</output></div>
+        <div class="reading"><span>C · multiplier</span><output id="multiplier">1.000</output></div>
+        <div class="reading result"><span>D · product</span><output id="product">1.000</output></div>
+      </div>
+      <div class="button-row">
+        <button id="nudgeLeft" type="button" aria-label="Nudge slide left">− Fine</button>
+        <button id="reset" type="button">Reset</button>
+        <button id="nudgeRight" type="button" aria-label="Nudge slide right">Fine +</button>
+      </div>
+    </div>
+    <p class="help"><strong>DRAG</strong> the centre rule to set the first factor · <strong>DRAG</strong> the glass cursor to the second · <strong>WHEEL / ← →</strong> for fine adjustment · <strong>SHIFT</strong> + arrows moves the cursor · <strong>DOUBLE-CLICK</strong> to reset</p>
+  </main>
+
+  <dialog id="infoDialog" class="info-dialog" aria-labelledby="legendTitle" aria-describedby="legendIntro">
+    <form method="dialog">
+      <button class="dialog-close" value="close" aria-label="Close scale legend">&times;</button>
+    </form>
+    <p class="dialog-kicker">Radix XII · scale legend</p>
+    <h2 id="legendTitle">What each scale does</h2>
+    <p id="legendIntro" class="dialog-intro">The logarithmic scales are recut for base twelve. Values sharing the cursor’s hairline are mathematically related.</p>
+    <dl class="scale-legend">
+      <div>
+        <dt>K</dt>
+        <dd><strong>Cubes and cube roots.</strong> A value on D lines up with its cube on the three-cycle K scale.</dd>
+      </div>
+      <div>
+        <dt>A</dt>
+        <dd><strong>Squares and square roots.</strong> The fixed, two-cycle square scale paired with D.</dd>
+      </div>
+      <div>
+        <dt>B</dt>
+        <dd><strong>Moving square scale.</strong> Pairs with A for square-scale multiplication, division, and proportion.</dd>
+      </div>
+      <div class="inverse">
+        <dt>CI</dt>
+        <dd><strong>Reciprocals.</strong> A reversed C scale: each value occupies the position of its inverse, making division and chained operations easier.</dd>
+      </div>
+      <div>
+        <dt>C</dt>
+        <dd><strong>Moving multiplier.</strong> Set its index over the first factor on D, then find the second factor on C.</dd>
+      </div>
+      <div>
+        <dt>D</dt>
+        <dd><strong>Fixed value and product scale.</strong> The primary reference scale where results are normally read.</dd>
+      </div>
+      <div>
+        <dt>L</dt>
+        <dd><strong>Base-12 logarithms.</strong> A linear scale from 0 to 1; a value on D aligns with its log₁₂ value on L.</dd>
+      </div>
+    </dl>
+    <p class="dialog-note"><b>X</b> = dek · <b>E</b> = el · <b>10</b> = twelve</p>
+  </dialog>
+
+  <script>
+    (() => {
+      const svg = document.querySelector('#rule');
+      const slide = document.querySelector('#slide');
+      const cursor = document.querySelector('#cursor');
+      const infoButton = document.querySelector('#infoButton');
+      const infoDialog = document.querySelector('#infoDialog');
+      const scaleStart = 130;
+      const scaleLength = 1340;
+      const scaleEnd = scaleStart + scaleLength;
+      const scaleNameX = 112;
+      const NS = 'http://www.w3.org/2000/svg';
+      const dozenDigits = ['0','1','2','3','4','5','6','7','8','9','X','E'];
+      let slideOffset = 0;
+      let cursorX = scaleStart;
+      let activeDrag = null;
+      let dragOrigin = 0;
+      let valueOrigin = 0;
+
+      infoButton.addEventListener('click', () => infoDialog.showModal());
+      infoDialog.addEventListener('click', event => {
+        if (event.target === infoDialog) infoDialog.close();
+      });
+
+      const el = (name, attrs = {}, text = '') => {
+        const node = document.createElementNS(NS, name);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        if (text) node.textContent = text;
+        return node;
+      };
+
+      const log12 = value => Math.log(value) / Math.log(12);
+      const position = value => scaleStart + log12(value) * scaleLength;
+      const inversePosition = value => scaleEnd - log12(value) * scaleLength;
+      const digit = value => value === 12 ? '10' : dozenDigits[value];
+
+      function addTick(group, x, baseline, direction, height, color = '#1c201a', width = 1) {
+        group.append(el('line', {
+          x1: x.toFixed(2), x2: x.toFixed(2), y1: baseline,
+          y2: baseline + direction * height, stroke: color, 'stroke-width': width
+        }));
+      }
+
+      function addLabel(group, x, y, value, anchor = 'middle', size = 13, color = '#171a15') {
+        group.append(el('text', {
+          x: x.toFixed(2), y, fill: color, 'text-anchor': anchor,
+          'font-family': 'Bahnschrift Condensed, Arial Narrow, Helvetica Neue, Arial, sans-serif',
+          'font-size': size, 'font-weight': '600', 'font-stretch': 'condensed',
+          'font-variant-numeric': 'tabular-nums', 'font-feature-settings': '"tnum" 1',
+          'dominant-baseline': 'alphabetic'
+        }, value));
+      }
+
+      function drawSingleScale(groupId, baseline, direction, name, options = {}) {
+        const group = document.querySelector(groupId);
+        const majorHeight = options.majorHeight ?? 25;
+        const labelDistance = options.labelDistance ?? 37;
+        const labelSize = options.labelSize ?? 14;
+        const endLabelSize = options.endLabelSize ?? 15;
+        const minorHalf = options.minorHalf ?? 17;
+        const minorQuarter = options.minorQuarter ?? 13;
+        const minorShort = options.minorShort ?? 8;
+        group.append(el('line', { x1: scaleStart, x2: scaleEnd, y1: baseline, y2: baseline, stroke: '#121510', 'stroke-width': 1.4 }));
+        addLabel(group, scaleNameX, baseline + direction * 17 + (direction > 0 ? 5 : 0), name, 'middle', 12, '#9d3328');
+
+        for (let whole = 1; whole <= 12; whole++) {
+          const x = position(whole);
+          addTick(group, x, baseline, direction, majorHeight, '#171a15', 1.5);
+          const labelY = baseline + direction * labelDistance + (direction > 0 ? 7 : 0);
+          addLabel(group, x, labelY, digit(whole), 'middle', whole === 12 ? endLabelSize : labelSize);
+          if (whole === 12) continue;
+
+          for (let twelfth = 1; twelfth < 12; twelfth++) {
+            const value = whole + twelfth / 12;
+            const minorX = position(value);
+            const height = twelfth === 6 ? minorHalf : (twelfth % 3 === 0 ? minorQuarter : minorShort);
+            addTick(group, minorX, baseline, direction, height, twelfth === 6 ? '#34382f' : '#5d604f', twelfth === 6 ? 1 : .75);
+          }
+        }
+      }
+
+      function drawInverseScale(groupId, baseline, name) {
+        const group = document.querySelector(groupId);
+        const red = '#a43b43';
+        const mutedRed = '#b16a6f';
+        group.append(el('line', {
+          x1: scaleStart, x2: scaleEnd, y1: baseline, y2: baseline,
+          stroke: red, 'stroke-width': 1.1
+        }));
+        addLabel(group, scaleNameX, baseline - 4, name, 'middle', 10, red);
+
+        for (let whole = 1; whole <= 12; whole++) {
+          const x = inversePosition(whole);
+          addTick(group, x, baseline, 1, 12, red, 1.2);
+          addLabel(group, x, baseline - 4, digit(whole), 'middle', whole === 12 ? 10 : 9, red);
+          if (whole === 12) continue;
+
+          for (let twelfth = 1; twelfth < 12; twelfth++) {
+            const xMinor = inversePosition(whole + twelfth / 12);
+            const height = twelfth === 6 ? 8 : (twelfth % 3 === 0 ? 6 : 4);
+            addTick(group, xMinor, baseline, 1, height, mutedRed, twelfth === 6 ? .9 : .65);
+          }
+        }
+      }
+
+      function drawDoubleScale(groupId, baseline, direction, name) {
+        const group = document.querySelector(groupId);
+        group.append(el('line', { x1: scaleStart, x2: scaleEnd, y1: baseline, y2: baseline, stroke: '#121510', 'stroke-width': 1.2 }));
+        addLabel(group, scaleNameX, baseline + direction * 16 + (direction > 0 ? 5 : 0), name, 'middle', 12, '#9d3328');
+
+        for (let cycle = 0; cycle < 2; cycle++) {
+          for (let whole = 1; whole <= 12; whole++) {
+            if (cycle === 1 && whole === 1) continue;
+            const x = scaleStart + (cycle + log12(whole)) * scaleLength / 2;
+            addTick(group, x, baseline, direction, 20, '#191c17', 1.25);
+            const label = whole === 12 && cycle === 0 ? '1' : digit(whole);
+            addLabel(group, x, baseline + direction * 31 + (direction > 0 ? 6 : 0), label, 'middle', 11);
+            if (whole === 12) continue;
+            for (let q = 3; q < 12; q += 3) {
+              const minorX = scaleStart + (cycle + log12(whole + q / 12)) * scaleLength / 2;
+              addTick(group, minorX, baseline, direction, q === 6 ? 12 : 8, '#56594a', .75);
+            }
+          }
+        }
+      }
+
+      function drawTripleScale(groupId, baseline, direction, name) {
+        const group = document.querySelector(groupId);
+        group.append(el('line', {
+          x1: scaleStart, x2: scaleEnd, y1: baseline, y2: baseline,
+          stroke: '#121510', 'stroke-width': 1.1
+        }));
+        addLabel(group, scaleNameX, baseline + direction * 16, name, 'middle', 11, '#9d3328');
+
+        for (let cycle = 0; cycle < 3; cycle++) {
+          for (let whole = 1; whole <= 12; whole++) {
+            if (cycle > 0 && whole === 1) continue;
+            const x = scaleStart + (cycle + log12(whole)) * scaleLength / 3;
+            addTick(group, x, baseline, direction, 16, '#191c17', 1.1);
+            const label = whole === 12 && cycle < 2 ? '1' : digit(whole);
+            addLabel(group, x, baseline + direction * 26, label, 'middle', 9);
+            if (whole === 12) continue;
+
+            for (let quarter = 3; quarter < 12; quarter += 3) {
+              const xMinor = scaleStart + (cycle + log12(whole + quarter / 12)) * scaleLength / 3;
+              addTick(group, xMinor, baseline, direction, quarter === 6 ? 10 : 6, '#56594a', .7);
+            }
+          }
+        }
+      }
+
+      function drawLinearScale(groupId, baseline, direction, name) {
+        const group = document.querySelector(groupId);
+        group.append(el('line', {
+          x1: scaleStart, x2: scaleEnd, y1: baseline, y2: baseline,
+          stroke: '#121510', 'stroke-width': 1.1
+        }));
+        addLabel(group, scaleNameX, baseline + direction * 27 + (direction > 0 ? 6 : 0), name, 'middle', 11, '#9d3328');
+
+        for (let twelfth = 0; twelfth <= 12; twelfth++) {
+          const x = scaleStart + twelfth / 12 * scaleLength;
+          addTick(group, x, baseline, direction, 14, '#191c17', 1.1);
+          const label = twelfth === 0 ? '0' : (twelfth === 12 ? '1' : `.${dozenDigits[twelfth]}`);
+          addLabel(group, x, baseline + direction * 27 + (direction > 0 ? 6 : 0), label, 'middle', 10);
+          if (twelfth === 12) continue;
+
+          for (let part = 1; part < 12; part++) {
+            const xMinor = scaleStart + (twelfth + part / 12) / 12 * scaleLength;
+            const height = part === 6 ? 9 : (part % 3 === 0 ? 7 : 4);
+            addTick(group, xMinor, baseline, direction, height, part === 6 ? '#34382f' : '#5d604f', part === 6 ? .9 : .65);
+          }
+        }
+      }
+
+      drawTripleScale('#scaleK', 112, -1, 'K');
+      drawDoubleScale('#scaleA', 168, -1, 'A');
+      drawDoubleScale('#scaleB', 170, 1, 'B');
+      drawInverseScale('#scaleCI', 226, 'CI');
+      drawSingleScale('#scaleC', 267, -1, 'C', {
+        majorHeight: 17, labelDistance: 18, labelSize: 11, endLabelSize: 12,
+        minorHalf: 12, minorQuarter: 9, minorShort: 6
+      });
+      drawSingleScale('#scaleD', 269, 1, 'D');
+      drawLinearScale('#scaleL', 341, 1, 'L');
+
+      function toDozenal(value, places = 3) {
+        if (!Number.isFinite(value)) return '—';
+        let integer = Math.floor(value);
+        let fraction = value - integer;
+        let whole = '';
+        do {
+          whole = dozenDigits[integer % 12] + whole;
+          integer = Math.floor(integer / 12);
+        } while (integer > 0);
+
+        let decimal = '';
+        for (let i = 0; i < places; i++) {
+          fraction *= 12;
+          const d = Math.floor(fraction + 1e-10);
+          decimal += dozenDigits[Math.min(d, 11)];
+          fraction -= d;
+        }
+        return `${whole}.${decimal}`;
+      }
+
+      function update() {
+        slide.setAttribute('transform', `translate(${slideOffset.toFixed(2)} 0)`);
+        cursor.setAttribute('transform', `translate(${cursorX.toFixed(2)} 0)`);
+
+        const multiplicand = Math.pow(12, slideOffset / scaleLength);
+        const multiplier = Math.pow(12, (cursorX - scaleStart - slideOffset) / scaleLength);
+        const product = Math.pow(12, (cursorX - scaleStart) / scaleLength);
+        document.querySelector('#multiplicand').value = toDozenal(multiplicand);
+        document.querySelector('#multiplier').value = toDozenal(multiplier);
+        document.querySelector('#product').value = toDozenal(product);
+      }
+
+      function clientToSvgX(event) {
+        const point = svg.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        return point.matrixTransform(svg.getScreenCTM().inverse()).x;
+      }
+
+      function startDrag(kind, event) {
+        activeDrag = kind;
+        dragOrigin = clientToSvgX(event);
+        valueOrigin = kind === 'slide' ? slideOffset : cursorX;
+        svg.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }
+
+      slide.addEventListener('pointerdown', event => startDrag('slide', event));
+      cursor.addEventListener('pointerdown', event => startDrag('cursor', event));
+
+      svg.addEventListener('pointermove', event => {
+        if (!activeDrag) return;
+        const delta = clientToSvgX(event) - dragOrigin;
+        if (activeDrag === 'slide') slideOffset = Math.max(-scaleLength, Math.min(scaleLength, valueOrigin + delta));
+        else cursorX = Math.max(scaleStart, Math.min(scaleEnd, valueOrigin + delta));
+        update();
+      });
+
+      const endDrag = () => { activeDrag = null; };
+      svg.addEventListener('pointerup', endDrag);
+      svg.addEventListener('pointercancel', endDrag);
+
+      svg.addEventListener('wheel', event => {
+        event.preventDefault();
+        const amount = event.shiftKey ? 4 : 1;
+        slideOffset = Math.max(-scaleLength, Math.min(scaleLength, slideOffset + (event.deltaY < 0 ? amount : -amount)));
+        update();
+      }, { passive: false });
+
+      svg.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === 'Home') {
+          slideOffset = 0;
+          cursorX = scaleStart;
+        } else {
+          const change = event.key === 'ArrowLeft' ? -1 : 1;
+          if (event.shiftKey) cursorX = Math.max(scaleStart, Math.min(scaleEnd, cursorX + change));
+          else slideOffset = Math.max(-scaleLength, Math.min(scaleLength, slideOffset + change));
+        }
+        update();
+      });
+
+      function reset() { slideOffset = 0; cursorX = scaleStart; update(); }
+      document.querySelector('#reset').addEventListener('click', reset);
+      document.querySelector('#nudgeLeft').addEventListener('click', () => { slideOffset = Math.max(-scaleLength, slideOffset - 1); update(); });
+      document.querySelector('#nudgeRight').addEventListener('click', () => { slideOffset = Math.min(scaleLength, slideOffset + 1); update(); });
+      svg.addEventListener('dblclick', reset);
+      update();
+    })();
+  </script>
+</body>
+</html>
