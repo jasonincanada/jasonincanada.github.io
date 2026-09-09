@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b10"><meta name="description" content="A quiet 2D asteroid avoidance game.">
+  <title>STILL</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+  <script defer src="physics.js"></script><script defer src="instruments.js"></script><script defer src="game.js"></script>
+</head>
+<body>
+  <main id="game">
+    <header class="topbar">
+      <a class="brand" href="./index.html" aria-label="STILL 2D home"><svg viewBox="0 0 42 42" fill="none" aria-hidden="true"><path d="m21 2 5 12 14 7-14 5-5 14-6-14L2 21l13-7Z" fill="currentColor"/><circle cx="21" cy="21" r="5" fill="#070b10"/></svg><strong>STILL <span>2D</span></strong></a>
+      <div class="alive-counter" title="Time survived in this flight, including time away. Collision freezes your final time; Restart begins a new flight from zero."><span id="alive-label">Alive</span> <strong id="alive-seconds">0s</strong></div>
+      <nav aria-label="Game controls">
+        <span id="save-status" role="status" hidden></span>
+        <button id="sound-button" class="plain" type="button" aria-label="Sound alerts" aria-pressed="false" title="Enable sound alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4Z"/><g class="sound-waves"><path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></g><path class="sound-muted" d="m16 9 6 6m0-6-6 6"/></svg></button>
+        <button id="help-button" class="plain" type="button" title="Controls · H">Help</button>
+      </nav>
+    </header>
+    <div class="flight-layout">
+      <section class="board panel" aria-label="Two-dimensional asteroid map">
+        <header class="panel-heading"><div><b>01</b><h2>Field</h2><span class="sector-size">100 km × 60 km</span></div><button id="locate-button" class="plain" type="button" title="Select the next collision asteroid · L">⌖ Threat</button><span class="live-tag" id="live-tag">● Live</span></header>
+        <div class="field-body"><div class="map-stage">
+          <canvas id="space" aria-label="Asteroid map. Axes show kilometers relative to your ship at zero: positive right and up, negative left and down. Muted red marks the next collision asteroid and its animated dashed wrapping route. Lime is your ship. Up to six stationary fading dots mark each asteroid’s past positions. Hover over an asteroid to see its distance and speed. Only the collision target's popup stays visible."></canvas>
+          <div class="preview-badge" id="preview-badge" hidden><span id="preview-offset">+0h</span><button id="live-button" type="button">Back to live ↵</button></div>
+        </div>
+        <aside class="field-controls" aria-label="Field legend and movement controls">
+          <div class="map-legend"><span><i class="key ship-key"></i> You</span><span><i class="key rock-key"></i> Threat</span></div>
+          <div class="manual"><span>Move</span><div class="touch-controls" aria-label="Manual movement; hold to move, release to stop"><button data-direction="left" type="button" aria-label="Move left">A</button><button data-direction="up" type="button" aria-label="Move up">W</button><button data-direction="down" type="button" aria-label="Move down">S</button><button data-direction="right" type="button" aria-label="Move right">D</button></div></div>
+        </aside></div>
+      </section>
+      <section class="distance-card panel" aria-label="Threat distance over time">
+        <header class="panel-heading">
+          <div><b>03</b><h2>Distance</h2></div>
+          <div class="distance-metrics">
+            <div class="distance-summary"><span id="distance-target">—</span><span id="instant-distance" title="Shortest wrapped distance to the predicted contact position; matches remaining route travel on the final leg">Direct to contact — km</span></div>
+            <div class="distance-calculation" aria-label="Remaining route divided by speed gives time to contact">
+              <span id="distance-readout" title="Remaining travel distance to contact, including wraps" hidden></span>
+              <span id="speed-readout" title="Asteroid speed across the field" hidden></span>
+              <span id="route-time" title="Hours remaining to contact; matches the slide rule and field preview" hidden></span>
+            </div>
+          </div>
+        </header>
+        <div class="distance-stage"><canvas id="distance-display" aria-label="Shortest wrapped distance to the predicted contact position over time, assuming the ship holds position." title="Fixed time from Start to contact. Lime Now shows progress; cyan shows preview. Hover or tap for range and future preview. Numbered lines mark edge wraps."></canvas></div>
+        <div class="slide-rule-stage"><canvas id="slide-rule-display" role="img" aria-label="Logarithmic C and D scales for remaining route distance divided by speed." title="Speed on C aligns with remaining route distance on D, including all wraps up to contact. Read time on D under the glowing C index. The time callout shows hours with the decimal placed correctly. During preview, this shows travel remaining from the selected future time. Back to live restores the present."></canvas></div>
+      </section>
+      <aside class="action-column" aria-label="Collision forecast and avoidance">
+        <section class="threat-card panel" aria-label="Next collision">
+          <div class="threat-heading"><span><i class="attention-lamp"></i><span id="timer-label">Impact in</span></span><span id="threat-id">AST–00</span></div>
+          <div id="timer" class="timer" role="timer"><span id="timer-days">—</span> <span id="timer-hours"></span> <span id="timer-minutes"></span> <span id="timer-seconds"></span></div>
+          <div class="arrival"><span id="arrival-time">Calculating…</span></div>
+        </section>
+        <section class="solution-card panel" aria-label="Avoidance solution">
+          <header class="panel-heading"><div><b>02</b><h2>Avoidance</h2></div></header>
+          <section class="live-passes" aria-labelledby="live-passes-heading">
+            <div class="live-passes-heading"><span id="live-passes-heading">Live close passes</span><span id="live-passes-scale" class="live-passes-tag"><span id="live-passes-mode">NOW</span> · 3 km radius</span></div>
+            <p id="live-passes-empty">No nearby asteroids</p>
+            <div id="live-passes-body" class="live-passes-body" hidden>
+              <div class="live-passes-stage"><canvas id="live-passes-display" role="img" aria-label="Nearby asteroid positions with extra horizontal viewing range"></canvas></div>
+              <div><p id="live-passes-caption" class="live-passes-caption">Edge clearance · now</p><div id="live-passes-list"></div></div>
+            </div>
+          </section>
+          <div id="encounter-heading" class="encounter-heading">Eventual collision</div>
+          <div class="encounter-stage" role="group" aria-labelledby="encounter-heading"><canvas id="solution-display" aria-label="Magnified encounter in the map's orientation. Muted red marks the collision if you stay. Cyan marks the proposed move that avoids it."></canvas><p id="solution-instruction" class="solution-instruction">Calculating…</p></div>
+          <div class="solution-facts"><span title="Minimum edge-to-edge clearance from the threatening asteroid during the illustrated pass after the suggested move"><small>Pass clearance</small><b id="clearance-value">—</b></span><span title="Time until the next collision measured from when the ship stops"><small>Next impact after move</small><b id="after-value">—</b></span></div>
+          <button id="execute-button" type="button" disabled><strong>Take evasive action</strong><span aria-hidden="true">↗</span></button>
+        </section>
+      </aside>
+    </div>
+    <div id="dialog-backdrop" class="dialog-backdrop" hidden>
+      <section id="game-dialog" class="game-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1">
+        <span id="dialog-kicker" class="dialog-kicker">STILL 2D</span><h1 id="dialog-title">Controls</h1>
+        <div id="death-survival" class="death-survival" hidden><span><span class="death-word">Dead</span> — but alive for</span><strong id="death-duration">0s</strong></div>
+        <p id="dialog-description"></p>
+        <div id="help-content" hidden>
+          <p><b>Field</b>Muted red marks the next collision asteroid. Follow its animated dashed red route; matching numbers connect opposite edges. The timer assumes you stay at your current position.</p>
+          <p><b>Preview</b>Hover or tap the distance graph to see future positions. Back to live returns to the present. Each asteroid leaves a dot every 15 minutes of flight time; up to six dots stay at their recorded positions and fade out over 90 minutes. Preview shows that history at the selected time. Your actual flight continues at normal speed.</p>
+          <p><b>Avoidance</b>Cyan marks a checked escape. Take evasive action flies there and stops. The close-up keeps the map's orientation; icons are enlarged for visibility. Close passes follows the graph's selected time, showing nearby asteroids, edge clearance, and closing or receding motion at that instant. PREVIEW marks projected positions; Back to live restores current positions. Its circles use the actual collision radii. The outer ring stays at 3 km, with faint rings at 2 and 1 km. Dashed courses extend across the rectangular view with arrows showing direction.</p>
+          <p><b>Distance</b>The header labels the distance to contact shown on the graph and the remaining route distance including wraps. Route distance divided by speed gives hours to contact, matching the slide rule and field preview. The graph shows the shortest wrapped distance from the asteroid to its predicted position at first contact, assuming you hold position. Both distances end at that same position and agree on the final approach. The original curve and scales stay fixed from Start to contact; the lime Now marker shows progress, even after reopening. Moving or changing threats starts a new graph. Hover or tap to see time and range and preview future points; past points keep the field live. Numbered lines match the field's wraps. The distance stays continuous across an edge, but its slope can change abruptly. Contact is zero remaining travel; collision prediction still accounts for both radii.</p>
+          <p><b>Slide rule</b>The C scale wraps across the fixed D scale. Speed on C sits over the remaining travel distance on D, including every wrap up to contact. Read time on D beneath the highlighted C index; the callout shows hours with the decimal placed correctly. Hover or tap the graph to show the route and time remaining from the selected future position. Back to live restores the present; the impact countdown always stays live.</p>
+          <p><b>Controls</b>Hold WASD, arrows, or the on-screen keys to move; release to stop. The ship turns smoothly toward its last movement and keeps that heading when stopped. Manual input cancels an assisted move. Flight continues while Help is open.</p>
+          <p><b>Background watch</b>Flight auto-saves and catches up while away. Quiet reminders sound at each whole countdown hour, then each minute from one hour remaining. During the final minute, just the higher boop sounds each second, stopping at collision. Use the speaker beside Help to enable or mute reminders; your choice is saved. Waves indicate active audio; a crossed speaker indicates muted or blocked audio. A click or keypress unlocks audio unless you have muted it. Sound needs an awake browser and computer.</p>
+          <p class="shortcuts">Esc · Close help<br>H · Help &nbsp; L · Threat</p>
+        </div>
+        <div class="dialog-actions"><button id="dialog-action" class="primary-button" type="button">Close</button></div>
+      </section>
+    </div>
+    <noscript><p class="no-script">Enable JavaScript to play.</p></noscript>
+  </main>
+</body>
+</html>

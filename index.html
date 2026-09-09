@@ -41,7 +41,8 @@
     }
 
     h2 {
-      margin: 0 0 0.75rem;
+      margin: 0 0 1rem;
+      color: #59636e;
       font-size: 0.8rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -50,6 +51,22 @@
     ul {
       margin: 0;
       padding-left: 1.25rem;
+    }
+
+    li {
+      padding-left: 0.25rem;
+    }
+
+    li + li {
+      margin-top: 1.5rem;
+    }
+
+    li::marker {
+      color: #8c959f;
+    }
+
+    li > a {
+      font-weight: 600;
     }
 
     li p {
@@ -84,6 +101,10 @@
       <li>
         <a href="./base-12/slide-rule/">Radix XII Base-12 Slide Rule</a>
         <p>An interactive logarithmic slide rule recut for dozenal arithmetic.</p>
+      </li>
+      <li>
+        <a href="./still/">STILL 2D</a>
+        <p>A quiet 2D asteroid avoidance game. Check in every now and then to move your ship as needed. Survive as long as possible.</p>
       </li>
     </ul>
   </main>
