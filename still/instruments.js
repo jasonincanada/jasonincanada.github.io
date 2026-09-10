@@ -74,7 +74,18 @@
       this.liveCanvas=$('live-passes-display');this.livePasses=[];
       this.layoutVersion=0;
       this.resizeObserver=new ResizeObserver(entries=>{for(const entry of entries)canvasSizes.set(entry.target,entry.contentRect);this.layoutVersion++;});
-      for(const canvas of [this.canvas,this.detail,this.distanceCanvas,this.ruleCanvas,this.liveCanvas])this.resizeObserver.observe(canvas);
+      const canvases=[this.canvas,this.detail,this.distanceCanvas,this.ruleCanvas,this.liveCanvas];
+      // A resumed tab or restored context may have lost its bitmap even though
+      // the plan is unchanged. Invalidate cached drawings, including impact's
+      // frozen frame, and remeasure before the next visible render.
+      const invalidate=()=>{for(const canvas of canvases)canvasSizes.delete(canvas);this.layoutVersion++;};
+      for(const canvas of canvases){
+        this.resizeObserver.observe(canvas);
+        canvas.addEventListener('contextrestored',invalidate);
+      }
+      window.addEventListener('focus',invalidate);
+      window.addEventListener('pageshow',invalidate);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)invalidate();});
       document.fonts.ready.then(()=>{this.layoutVersion++;});
       const chartPhase=event=>{const r=this.distanceCanvas.getBoundingClientRect(),p=this.distancePlot;return p?Math.max(0,Math.min(1,(event.clientX-r.left-p.left)/p.width)):0;};
       const previewAt=event=>{if(this.distancePlot&&this.state?.threat&&!this.state.ended&&!this.state.maneuver){
