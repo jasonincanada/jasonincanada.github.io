@@ -72,9 +72,10 @@
       this.distanceCanvas=$('distance-display');this.distanceHover=null;this.distanceInfo=null;this.distancePlot=null;this.distanceAnchor=null;this.distanceTrace=null;
       this.ruleCanvas=$('slide-rule-display');this.ruleInfo=null;
       this.liveCanvas=$('live-passes-display');this.livePasses=[];
+      this.phaseCanvas=$('phase-display');this.instrument='avoidance';this.phaseInfo=null;
       this.layoutVersion=0;
       this.resizeObserver=new ResizeObserver(entries=>{for(const entry of entries)canvasSizes.set(entry.target,entry.contentRect);this.layoutVersion++;});
-      const canvases=[this.canvas,this.detail,this.distanceCanvas,this.ruleCanvas,this.liveCanvas];
+      const canvases=[this.canvas,this.detail,this.distanceCanvas,this.ruleCanvas,this.liveCanvas,this.phaseCanvas];
       // A resumed tab or restored context may have lost its bitmap even though
       // the plan is unchanged. Invalidate cached drawings, including impact's
       // frozen frame, and remeasure before the next visible render.
@@ -87,6 +88,45 @@
       window.addEventListener('pageshow',invalidate);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)invalidate();});
       document.fonts.ready.then(()=>{this.layoutVersion++;});
+      const tabs=[$('avoidance-tab'),$('phase-tab')];
+      const selectInstrument=(index,persist=true)=>{
+        this.instrument=index?'phase':'avoidance';
+        tabs.forEach((tab,i)=>{tab.setAttribute('aria-selected',String(i===index));tab.tabIndex=i===index?0:-1;});
+        $('avoidance-view').hidden=index!==0;$('phase-view').hidden=index!==1;
+        setText('instrument-heading',index?'Phase portrait':'Avoidance');
+        if(persist)try{localStorage.setItem('still-instrument-view',this.instrument);}catch(_){/* Switching still works without storage. */}
+        invalidate();
+      };
+      let savedInstrument;
+      try{savedInstrument=localStorage.getItem('still-instrument-view');}catch(_){/* Default to Avoidance when storage is unavailable. */}
+      selectInstrument(savedInstrument==='phase'?1:0,false);
+      const derivativeToggle=$('derivative-toggle');
+      this.derivativeVisible=false;
+      try{this.derivativeVisible=localStorage.getItem('still-distance-derivative')==='true';}catch(_){/* The overlay defaults off. */}
+      const setDerivativeVisibility=()=>{
+        derivativeToggle.checked=this.derivativeVisible;
+        $('distance-legend').hidden=!this.derivativeVisible;
+        if(this.derivativeVisible)this.distanceCanvas.setAttribute('aria-describedby','distance-legend');
+        else this.distanceCanvas.removeAttribute('aria-describedby');
+        this.distanceCanvas.title='Fixed time from Start to contact. Lime Now shows progress; cyan shows preview. Numbered lines mark field wraps. Hover or tap to preview the future.'+
+          (this.derivativeVisible?' Dashed rate uses the right km/h axis: negative is closing. Open circles mark undefined derivatives at corners.':'');
+        invalidate();
+      };
+      setDerivativeVisibility();
+      derivativeToggle.addEventListener('change',()=>{
+        this.derivativeVisible=derivativeToggle.checked;
+        try{localStorage.setItem('still-distance-derivative',String(this.derivativeVisible));}catch(_){/* Toggling still works without storage. */}
+        setDerivativeVisibility();
+      });
+      tabs.forEach((tab,index)=>{
+        tab.addEventListener('click',()=>selectInstrument(index));
+        tab.addEventListener('keydown',event=>{
+          if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+          event.preventDefault();event.stopPropagation();
+          const next=event.key==='Home'?0:event.key==='End'?1:1-index;
+          selectInstrument(next);tabs[next].focus();
+        });
+      });
       const chartPhase=event=>{const r=this.distanceCanvas.getBoundingClientRect(),p=this.distancePlot;return p?Math.max(0,Math.min(1,(event.clientX-r.left-p.left)/p.width)):0;};
       const previewAt=event=>{if(this.distancePlot&&this.state?.threat&&!this.state.ended&&!this.state.maneuver){
         this.distanceHover=chartPhase(event);
@@ -127,7 +167,11 @@
       const distanceKey=[...course,state.phase,this.distanceHover,Math.floor(state.elapsed*2),Math.round((state.elapsed+state.timeToImpact)*1000)].join('|');
       const remaining=state.timeToImpact*(1-state.phase);
       const nearContact=state.threat&&!state.ended&&!state.maneuver&&remaining>0&&remaining<=300;
-      if(nearContact||distanceKey!==this.distanceKey){this.drawDistance(state);this.distanceKey=distanceKey;}
+      if(nearContact||distanceKey!==this.distanceKey){
+        this.drawDistance(state);
+        if(this.instrument==='phase')this.drawPhasePortrait(state);
+        this.distanceKey=distanceKey;
+      }
       this.drawMap(state,now);
       const solutionKey=[...course,this.shipHeading,state.plan?0:Math.floor(state.elapsed)].join('|');
       if(solutionKey!==this.solutionKey||state.plan!==this.solutionPlan){
@@ -422,6 +466,7 @@
         this.distanceInfo=null;this.distancePlot=null;
         setText('speed-readout',speed===null?'':'Speed '+speed.toFixed(2)+' km/h');
         setText('instant-distance','Direct to contact — km');
+        setText('distance-rate','');
         $('distance-readout').hidden=true;
         $('route-time').hidden=true;
         this.drawSlideRule(null,null);
@@ -444,9 +489,10 @@
       const maximum=Math.max(...points.map(p=>p.distance/10),1),rawStep=maximum/3;
       const power=10**Math.floor(Math.log10(rawStep)),ratio=rawStep/power;
       const step=(ratio<=1?1:ratio<=2?2:ratio<=5?5:10)*power,yMax=Math.ceil(maximum/step)*step;
-      const plot={left:48,top:22,width:Math.max(1,w-68),height:Math.max(1,h-57)};
+      const plot={left:48,top:22,width:Math.max(1,w-(this.derivativeVisible?116:84)),height:Math.max(1,h-57)};
       this.distancePlot=plot;
       const x=t=>plot.left+t/horizon*plot.width,y=km=>plot.top+plot.height*(1-km/yMax);
+      const rateColor='#b8ac7a',rateMax=Math.max(.01,Math.ceil(speed*100)/100),rateY=rate=>plot.top+plot.height*(1-rate/rateMax)/2;
       const unit=horizon>=7200?3600:horizon>=120?60:1,suffix=unit===3600?'h':unit===60?'min':'s';
       const tick=v=>Number(v.toFixed(v<10?1:0)).toString();
       for(let value=0;value<=yMax+step*.01;value+=step){
@@ -454,6 +500,12 @@
         text(c,tick(value),plot.left-10,py,'#a7b6c5',7,'right');
       }
       text(c,'km',plot.left-10,10,'#a7b6c5',7,'right');
+      if(this.derivativeVisible)text(c,'km/h',w-6,10,rateColor,7,'right');
+      for(const rate of this.derivativeVisible?[rateMax,0,-rateMax]:[]){
+        const py=rateY(rate),right=plot.left+plot.width;
+        line(c,{x:right,y:py},{x:right+4,y:py},rateColor+'80');
+        text(c,(rate>0?'+':'')+rate.toFixed(2),w-6,py,rateColor,7,'right');
+      }
       for(let i=0;i<=4;i++){
         const px=x(horizon*i/4);
         line(c,{x:px,y:plot.top},{x:px,y:plot.top+plot.height},'#607f992b');
@@ -469,11 +521,24 @@
       });
       const fill=c.createLinearGradient(0,plot.top,0,plot.top+plot.height);fill.addColorStop(0,'#91afce26');fill.addColorStop(1,'#91afce02');
       c.beginPath();c.moveTo(x(0),y(0));for(const p of points)c.lineTo(x(p.time),y(p.distance/10));c.lineTo(x(horizon),y(0));c.closePath();c.fillStyle=fill;c.fill();
+      // Each smooth branch has its own path: never draw through a derivative jump.
+      if(this.derivativeVisible){
+        line(c,{x:plot.left,y:rateY(0)},{x:plot.left+plot.width,y:rateY(0)},rateColor+'80',1.2);
+        c.setLineDash([4,4]);c.strokeStyle=rateColor+'90';c.lineWidth=1.2;
+        for(const segment of trace.rateSegments){
+          c.beginPath();segment.forEach((p,i)=>{const px=x(p.time),py=rateY(p.rate*360);i?c.lineTo(px,py):c.moveTo(px,py);});c.stroke();
+        }
+        c.setLineDash([]);
+      }
       c.beginPath();points.forEach((p,i)=>{const px=x(p.time),py=y(p.distance/10);i?c.lineTo(px,py):c.moveTo(px,py);});c.strokeStyle=C.blue;c.lineWidth=1.8;c.stroke();
+      // Keep the open limits legible even where the distance curve crosses them.
+      for(const segment of this.derivativeVisible?trace.rateSegments:[])for(const p of [segment[0],segment.at(-1)])if(p.open){
+        const q={x:x(p.time),y:rateY(p.rate*360)};
+        c.beginPath();c.arc(q.x,q.y,3,0,Math.PI*2);c.fillStyle='#090f16';c.fill();ring(c,q,3,rateColor+'cc',1);
+      }
       const contact=0,cy=y(contact);
-      line(c,{x:plot.left,y:cy},{x:plot.left+plot.width,y:cy},C.danger+'70',1,[4,5]);
-      ring(c,{x:x(horizon),y:cy},3,C.danger,1.5);
-      text(c,'Contact',x(horizon)-7,Math.max(plot.top+12,cy-12),C.danger,7,'right');
+      ring(c,{x:x(horizon),y:cy},3,C.trajectory,1.5);
+      text(c,'Contact',x(horizon),Math.max(plot.top+12,cy-14),C.trajectory,11,'center');
       // Real progress remains visible while the separate preview explores the future.
       const nowX=x(elapsed),nowDistance=P.wrappedDistance(contactPoint,a.rock,elapsed,a.size);
       c.fillStyle=C.lime+'0c';c.fillRect(plot.left,plot.top,nowX-plot.left,plot.height);
@@ -490,6 +555,12 @@
       if(s.phase>0){line(c,{x:cursor.x,y:plot.top},{x:cursor.x,y:plot.top+plot.height},C.cyan+'bb',1);
       c.beginPath();c.arc(cursor.x,cursor.y,3.5,0,Math.PI*2);c.fillStyle=C.cyan;c.fill();}
       const t=this.distanceHover===null?cursorTime:this.distanceHover*horizon,distance=P.wrappedDistance(contactPoint,a.rock,t,a.size)/10;
+      const rate=P.wrappedDistanceRate(contactPoint,a.rock,t,a.size);
+      // A small pointer tolerance makes exact, otherwise hard-to-hit corners discoverable.
+      const nearCorner=this.distanceHover!==null&&trace.rateBreaks.some(time=>Math.abs(x(time)-x(t))<=4);
+      const rateLabel=nearCorner?'d′ undefined at corner':rate===null?'d′ undefined'+(Math.abs(t-horizon)<1e-7?' at contact':' at corner'):
+        'd′ '+(rate>0?'+':'')+(rate*360).toFixed(2)+' km/h'+(rate<0?' · closing':rate>0?' · opening':' · level');
+      setText('distance-rate',rateLabel);
       // Measure the route from the same future position shown on the field to contact.
       const previewOffset=s.phase*s.timeToImpact,remaining=Math.max(0,s.timeToImpact-previewOffset);
       const route=P.wrappedPath({x:s.threat.position.x+s.threat.velocity.x*previewOffset-s.player.x,y:s.threat.position.y+s.threat.velocity.y*previewOffset-s.player.y},s.threat.velocity,remaining,s.size);
@@ -508,8 +579,83 @@
         const lx=Math.max(plot.left,Math.min(w-width-5,px+10)),ly=plot.top+13;
         c.fillStyle='#203142ee';c.fillRect(lx,ly-11,width,24);text(c,label,lx+8,ly+1,'#e4ebf0',8);
       }
-      this.distanceInfo={threat:s.threat.id,horizon,startedAt:a.elapsed,elapsed,progress:elapsed/horizon,yMax,samples:points.length,start:points[0].distance,end:points.at(-1).distance,contact:contact*10,cursorTime,cursorDistance,wrapTimes:crossings.map(p=>p.time),plot:{...plot}};
-      this.distanceCanvas.setAttribute('aria-label','Distance to '+idOf(s.threat)+', fixed from first plotted time to contact, assuming hold. '+(elapsed/horizon*100).toFixed(1)+' percent elapsed. Now '+(nowDistance/10).toFixed(2)+' kilometers; contact at '+contact.toFixed(2)+' kilometers in '+P.briefTime(s.timeToImpact)+'. Hover or tap the graph to preview the future.');
+      this.distanceInfo={threat:s.threat.id,horizon,startedAt:a.elapsed,elapsed,progress:elapsed/horizon,yMax,samples:points.length,start:points[0].distance,end:points.at(-1).distance,contact:contact*10,cursorTime,cursorDistance,wrapTimes:crossings.map(p=>p.time),rate:rate===null?null:rate*360,rateMax,rateBreakTimes:trace.rateBreaks,plot:{...plot}};
+      this.distanceCanvas.setAttribute('aria-label','Distance to '+idOf(s.threat)+', fixed from first plotted time to contact, assuming hold. '+(elapsed/horizon*100).toFixed(1)+' percent elapsed. Now '+(nowDistance/10).toFixed(2)+' kilometers; contact at '+contact.toFixed(2)+' kilometers in '+P.briefTime(s.timeToImpact)+'. '+
+        (this.derivativeVisible?'Muted dashed derivative uses the right axis in kilometers per hour; negative means closing. Open circles show one-sided limits where the derivative is undefined. '+rateLabel+'. ':'')+'Hover or tap the graph to preview the future.');
+    }
+    drawPhasePortrait(s){
+      const {c,w,h}=prepare(this.phaseCanvas),a=this.distanceAnchor,trace=this.distanceTrace,info=this.distanceInfo;
+      const preview=s.phase>0&&!s.ended,color='#b8ac7a';
+      setText('phase-mode',s.ended?'IMPACT':preview?'PREVIEW':'NOW');
+      $('phase-mode').classList.toggle('is-preview',preview);
+      if(!a||!trace||!info){
+        const message=s.ended?'Impact':s.maneuver?'Updating course…':'No predicted threat';
+        text(c,message,w/2,h/2,C.muted,8,'center');
+        setText('phase-reading','Distance × distance rate');
+        this.phaseCanvas.setAttribute('aria-label',message);this.phaseInfo=null;return;
+      }
+      const target={x:a.rock.position.x+a.rock.velocity.x*a.horizon,y:a.rock.position.y+a.rock.velocity.y*a.horizon};
+      // Reuse the exact smooth branches of the time plot, including both limits.
+      if(!trace.phaseSegments)trace.phaseSegments=trace.rateSegments.map(segment=>segment.map(p=>({
+        ...p,distance:P.wrappedDistance(target,a.rock,p.time,a.size)/10,rate:p.rate*360
+      })));
+      const segments=trace.phaseSegments,plot={left:62,top:36,width:Math.max(1,w-82),height:Math.max(1,h-80)};
+      const xMax=info.yMax,rateMax=info.rateMax;
+      const project=p=>({x:plot.left+p.distance/xMax*plot.width,y:plot.top+(1-p.rate/rateMax)*plot.height/2});
+      const right=plot.left+plot.width,bottom=plot.top+plot.height,zero=project({distance:0,rate:0}).y;
+      text(c,'d′ · km/h',plot.left,14,color,7);
+      for(let i=0;i<=3;i++){
+        const distance=xMax*i/3,px=project({distance,rate:0}).x;
+        line(c,{x:px,y:plot.top},{x:px,y:bottom},'#607f9930');
+        text(c,Number(distance.toFixed(1)).toString(),px,bottom+17,C.muted,7,i===0?'left':i===3?'right':'center');
+      }
+      for(const fraction of [1,.5,0,-.5,-1]){
+        const rate=rateMax*fraction,py=project({distance:0,rate}).y;
+        line(c,{x:plot.left,y:py},{x:right,y:py},fraction===0?color+'80':'#607f9930',fraction===0?1.2:1);
+        text(c,(rate>0?'+':'')+rate.toFixed(2),plot.left-8,py,color,7,'right');
+      }
+      text(c,'Distance to contact · km',plot.left+plot.width/2,h-9,C.blue,7,'center');
+      text(c,'RECEDING',right-5,zero-12,color+'80',11,'right');
+      text(c,'APPROACHING',right-5,zero+12,color+'80',11,'right');
+      for(const segment of segments){
+        const path=segment.map(project);
+        c.beginPath();path.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.strokeStyle=color+'90';c.lineWidth=1.3;c.stroke();
+        // Place one time-direction arrow halfway along each visible arc.
+        const lengths=path.map((p,i)=>i?Math.hypot(p.x-path[i-1].x,p.y-path[i-1].y):0);
+        const total=lengths.reduce((sum,length)=>sum+length,0);
+        let traversed=0;
+        if(total>28)for(let i=1;i<path.length;i++){
+          const length=lengths[i];
+          if(length&&traversed+length>=total*.5){
+            const f=(total*.5-traversed)/length,dx=(path[i].x-path[i-1].x)/length,dy=(path[i].y-path[i-1].y)/length;
+            const p={x:path[i-1].x+f*length*dx,y:path[i-1].y+f*length*dy};
+            arrow(c,{x:p.x-dx*5,y:p.y-dy*5},{x:p.x+dx*5,y:p.y+dy*5},color+'cc',1.2,5);break;
+          }
+          traversed+=length;
+        }
+      }
+      const limits=segments.flatMap(segment=>[segment[0],segment.at(-1)]).filter(p=>p.open);
+      for(const p of limits){
+        const q=project(p);c.beginPath();c.arc(q.x,q.y,3,0,Math.PI*2);c.fillStyle='#0d1721';c.fill();ring(c,q,3,color,1);
+      }
+      const first=segments[0]?.[0],last=segments.at(-1)?.at(-1);
+      if(first){const q=project(first);ring(c,q,3,C.blue,1);text(c,'Start',Math.min(right-35,q.x+7),Math.max(plot.top+12,q.y-12),C.blue,11);}
+      if(last){const q=project(last);ring(c,q,3,C.trajectory,1.5);text(c,'Contact',q.x+7,q.y-12,C.trajectory,11);}
+      const marker=(time,markerColor)=>{
+        const distance=P.wrappedDistance(target,a.rock,time,a.size)/10,rawRate=P.wrappedDistanceRate(target,a.rock,time,a.size),rate=rawRate===null?null:rawRate*360;
+        const positions=rate===null?limits.filter(p=>Math.abs(p.time-time)<1e-7):[{time,distance,rate}];
+        for(const p of positions){const q=project(p);ring(c,q,5,markerColor,1.7);
+          if(rate!==null){c.beginPath();c.arc(q.x,q.y,2,0,Math.PI*2);c.fillStyle=markerColor;c.fill();}
+        }
+        return {time,distance,rate,limits:rate===null?positions.map(p=>p.rate):[]};
+      };
+      const now=marker(info.elapsed,C.lime),current=preview?marker(info.cursorTime,C.cyan):now;
+      const reading=current.distance.toFixed(2)+' km · '+(current.rate===null?'d′ undefined':(current.rate>0?'+':'')+current.rate.toFixed(2)+' km/h');
+      setText('phase-reading',reading);
+      this.phaseInfo={...current,now,preview,branches:segments.length,jumps:trace.rateBreaks.length,xMax,rateMax,plot};
+      this.phaseCanvas.setAttribute('aria-label','Phase portrait of '+idOf(s.threat)+': horizontal distance to contact in kilometers, vertical distance rate in kilometers per hour. '+
+        segments.length+' smooth branches with arrows following time. Open ends mark derivative jumps; no lines connect across them. Lime marks now; cyan marks preview. '+
+        (preview?'Preview: ':'Now: ')+reading+'. Final approach runs left toward zero distance at minus the asteroid speed.');
     }
     drawSlideRule(distance,speed,preview=false){
       const {c,w}=prepare(this.ruleCanvas),left=78,width=Math.max(1,w-86),right=left+width;
@@ -569,7 +715,7 @@
       this.ruleInfo={distance,speed,hours,mantissa,shift,indexX,operandX,left,width,preview};
       this.ruleCanvas.setAttribute('aria-label','Slide rule: remaining '+(preview?'preview':'live')+' route including wraps, '+distance.toPrecision(4)+' kilometers divided by '+speed.toPrecision(4)+' kilometers per hour. Speed on C aligns with route distance on D. C index reads '+mantissa.toFixed(3)+' on D; the time callout shows '+hours.toFixed(3)+' hours until contact with the decimal placed correctly.');
     }
-    getState(){return {selected:this.selected,routeSegments:this.routes.length,phase:this.state?.phase||0,heading:this.shipHeading,contacts:this.hits.map(p=>({...p})),distance:this.distanceInfo,slideRule:this.ruleInfo,livePasses:this.livePasses.map(p=>({...p}))};}
+    getState(){return {selected:this.selected,routeSegments:this.routes.length,phase:this.state?.phase||0,heading:this.shipHeading,contacts:this.hits.map(p=>({...p})),distance:this.distanceInfo,slideRule:this.ruleInfo,livePasses:this.livePasses.map(p=>({...p})),instrument:this.instrument,phasePortrait:this.phaseInfo,derivativeVisible:this.derivativeVisible};}
   }
   root.FlightBoard=FlightBoard;
 })(window);

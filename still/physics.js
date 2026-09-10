@@ -59,27 +59,47 @@
     const span=axes(size);
     return Math.hypot(wrap(rock.position.x+rock.velocity.x*time-ship.x,span.x),wrap(rock.position.y+rock.velocity.y*time-ship.y,span.y));
   }
+  // Analytic slope in world units/second; null at a seam or zero-distance cusp.
+  function wrappedDistanceRate(ship,rock,time,size){
+    const span=axes(size),v=rock.velocity;
+    if(!length(v))return 0;
+    const x=wrap(rock.position.x+v.x*time-ship.x,span.x),y=wrap(rock.position.y+v.y*time-ship.y,span.y),d=Math.hypot(x,y);
+    if(d<1e-8||(v.x&&Math.abs(Math.abs(x)-span.x/2)<1e-8)||(v.y&&Math.abs(Math.abs(y)-span.y/2)<1e-8))return null;
+    return (x*v.x+y*v.y)/d;
+  }
   function distanceTrace(ship,rock,size,horizon,samples=400){
-    if(!rock||!Number.isFinite(horizon)||horizon<0)return {points:[],crossings:[]};
-    if(horizon===0)return {points:[{time:0,distance:wrappedDistance(ship,rock,0,size)}],crossings:[]};
+    if(!rock||!Number.isFinite(horizon)||horizon<0)return {points:[],crossings:[],rateSegments:[],rateBreaks:[]};
+    if(horizon===0)return {points:[{time:0,distance:wrappedDistance(ship,rock,0,size)}],crossings:[],rateSegments:[],rateBreaks:[]};
     const relative={x:rock.position.x-ship.x,y:rock.position.y-ship.y};
-    const segments=wrappedPath(relative,rock.velocity,horizon,size),points=[],crossings=[];
+    const segments=wrappedPath(relative,rock.velocity,horizon,size),points=[],crossings=[],rateSegments=[];
     const speed2=rock.velocity.x**2+rock.velocity.y**2;
     for(const segment of segments){
       const duration=segment.t1-segment.t0;
       const count=Math.max(1,Math.ceil(duration/horizon*samples));
-      const times=Array.from({length:count+1},(_,i)=>duration*i/count);
+      // Preserve the exact boundary: duration*count/count can round away from it.
+      const times=Array.from({length:count+1},(_,i)=>i===count?duration:duration*i/count);
       // Preserve every minimum and seam exactly, even in a long, densely folded route.
-      if(speed2){const closest=-(segment.start.x*rock.velocity.x+segment.start.y*rock.velocity.y)/speed2;if(closest>0&&closest<duration)times.push(closest);}
+      if(speed2){const closest=-(segment.start.x*rock.velocity.x+segment.start.y*rock.velocity.y)/speed2;if(closest>1e-8&&closest<duration-1e-8)times.push(closest);}
       times.sort((a,b)=>a-b);
+      let rates=[];
       for(const t of times){
-        const time=segment.t0+t;
+        const time=t===duration?segment.t1:segment.t0+t;
+        if(rates.length&&Math.abs(rates.at(-1).time-time)<1e-8)continue;
+        const x=segment.start.x+rock.velocity.x*t,y=segment.start.y+rock.velocity.y*t,distance=Math.hypot(x,y);
+        if(distance<1e-8&&speed2){
+          // At an exact pass through the target, retain both one-sided limits.
+          if(rates.length){rates.push({time,rate:-Math.sqrt(speed2),open:true});rateSegments.push(rates);rates=[];}
+          if(t<duration-1e-8)rates.push({time,rate:Math.sqrt(speed2),open:true});
+        }else rates.push({time,rate:distance?(x*rock.velocity.x+y*rock.velocity.y)/distance:0,
+          open:(t===0&&segment.t0>0)||(t===duration&&segment.t1<horizon)});
         if(points.length&&Math.abs(points.at(-1).time-time)<1e-8)continue;
-        points.push({time,distance:Math.hypot(segment.start.x+rock.velocity.x*t,segment.start.y+rock.velocity.y*t)});
+        points.push({time,distance});
       }
+      if(rates.length)rateSegments.push(rates);
       if(segment.t1<horizon-1e-7)crossings.push({time:segment.t1,distance:points.at(-1).distance});
     }
-    return {points,crossings};
+    const rateBreaks=[...new Set(rateSegments.flatMap(segment=>segment.filter(p=>p.open&&p.time>0&&p.time<horizon).map(p=>p.time)))];
+    return {points,crossings,rateSegments,rateBreaks};
   }
   function encounterGeometry(ship,rock,size,time){
     if(!rock||!Number.isFinite(time))return null;
@@ -167,5 +187,5 @@
     if(seconds>=3600)return Math.floor(seconds/3600)+'h '+Math.floor(seconds/60)%60+'m';
     return Math.max(0,Math.ceil(seconds/60))+' min';
   }
-  root.StillPhysics=Object.freeze({FORECAST_HORIZON,SHIP_RADIUS,MIN_SAFE_TIME,wrap,length,timeToWrappedImpact,predict,advancePosition,wrappedPath,wrappedDistance,distanceTrace,encounterGeometry,validateAvoidance,createAvoidanceSearch,planAvoidance,formatTime,briefTime});
+  root.StillPhysics=Object.freeze({FORECAST_HORIZON,SHIP_RADIUS,MIN_SAFE_TIME,wrap,length,timeToWrappedImpact,predict,advancePosition,wrappedPath,wrappedDistance,wrappedDistanceRate,distanceTrace,encounterGeometry,validateAvoidance,createAvoidanceSearch,planAvoidance,formatTime,briefTime});
 })(window);
