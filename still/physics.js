@@ -88,7 +88,7 @@
     const entry={x:wrap(rock.position.x+rock.velocity.x*time-ship.x,span.x),y:wrap(rock.position.y+rock.velocity.y*time-ship.y,span.y)};
     return {along,normal,entry,offset:entry.x*normal.x+entry.y*normal.y,radius:rock.radius+SHIP_RADIUS};
   }
-  const MIN_SAFE_TIME=3600;
+  const MIN_SAFE_TIME=4*3600;
   function clearanceDuring(ship,rock,size,horizon){
     const segments=wrappedPath({x:rock.position.x-ship.x,y:rock.position.y-ship.y},rock.velocity,horizon,size);
     const speed2=rock.velocity.x**2+rock.velocity.y**2;
@@ -114,8 +114,8 @@
     const destination={x:wrap(ship.x+delta.x,span.x),y:wrap(ship.y+delta.y,span.y)};
     const arrival=rocks.map(rock=>{const position={...rock.position};advancePosition(position,rock.velocity,duration,size);return {...rock,position};});
     const safeFor=predict(destination,arrival,size).time,nextImpact=duration+safeFor;
-    if(safeFor<MIN_SAFE_TIME||nextImpact<=current.time)return null;
-    // Still protect the first hour against every asteroid, including tangencies.
+    if(safeFor<MIN_SAFE_TIME)return null;
+    // Protect the fixed four-hour window against every asteroid, including tangencies.
     if(arrival.some(rock=>clearanceDuring(destination,rock,size,MIN_SAFE_TIME)<1e-6))return null;
     return {delta:{...delta},velocity,destination,duration,distance,clearance,safeFor,nextImpact,beforeImpact:current.time,geometry};
   }
@@ -145,14 +145,13 @@
       // candidate against their current positions, never an old search snapshot.
       const current=predict(ship,rocks,size);
       if(!current.asteroid||current.time<=0){done=true;return {plan:null,done,attempts};}
-      let best=null;
       for(let i=0;i<limit;i++){
         const delta=candidates.next().value;attempts++;
         const proposal=validateAvoidance(ship,rocks,size,delta,current);
-        if(proposal&&(!best||proposal.nextImpact>best.nextImpact))best=proposal;
-        if(best&&!Number.isFinite(best.nextImpact))break;
+        // The first qualifying escape meets the goal; longer countdowns get no preference.
+        if(proposal){done=true;return {plan:proposal,done,attempts};}
       }
-      done=!!best;return {plan:best,done,attempts};
+      return {plan:null,done,attempts};
     }};
   }
   function planAvoidance(ship,rocks,size){return createAvoidanceSearch(ship,rocks,size).step(30).plan;}

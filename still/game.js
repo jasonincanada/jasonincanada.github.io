@@ -5,7 +5,7 @@
   const player={x:0,y:0},keys=new Set(),touches=new Map();
   let rocks=[],elapsed=0,collisionAt=Infinity,predictionAt=0,threat=null,plan=null,planAt=0;
   let ended=false,maneuver=null,dialog=null,focusBefore=null,generation=0,heading=0;
-  let phase=0,lastNow=performance.now(),lastSave=0,lastUI=0,lastFrame=0;
+  let phase=0,lastNow=Date.now(),lastSave=0,lastUI=0,lastFrame=0;
   let watchLeft=Infinity,alertCount=0,lastExecutedPlan=null,storageOK=true;
   let aliveElapsed=0;
   let uiKey=null,uiPlan=null;
@@ -43,7 +43,7 @@
         if(Number.isFinite(next.time)&&next.time>0){const factor=next.time/86400;for(const r of rocks){r.velocity.x*=factor;r.velocity.y*=factor;}}
       }
     }
-    forecast();lastNow=performance.now();renderUI();saveRun();
+    forecast();lastNow=Date.now();renderUI();saveRun();
   }
   function timeLeft(){return Math.max(0,collisionAt-elapsed);}
   function aliveSeconds(){return Math.floor(aliveElapsed);}
@@ -80,7 +80,9 @@
     const x=Number(d.has('right'))-Number(d.has('left')),y=Number(d.has('up'))-Number(d.has('down')),n=Math.hypot(x,y)||1;
     return {x:x/n*8,y:y/n*8};
   }
-  function advance(now){
+  function advance(){
+    // Wall time includes device sleep, even when the performance clock stops.
+    const now=Date.now();
     let dt=Math.max(0,(now-lastNow)/1000);lastNow=Math.max(lastNow,now);
     if(ended||!dt)return;
     let moved=false;
@@ -104,11 +106,12 @@
       }
     }
     watch();
-    if(now-lastSave>5000)saveRun();
+    if(performance.now()-lastSave>5000)saveRun();
   }
   function execute(){
     if(ended||maneuver||phase!==0)return false;
-    advance(performance.now());
+    advance();
+    if(ended)return false;
     const proposal=plan?P.validateAvoidance(player,rocks,SIZE,plan.delta):null;
     if(!proposal){forecast();renderUI();return false;}
     clearInput();plan=proposal;planAt=elapsed;avoidanceSearch=null;
@@ -212,7 +215,7 @@
       const date=new Date(Date.now()+t*1000);
       set('arrival-time',date.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' local time');
     }else set('arrival-time',ended?'Flight ended':'Next 30 days clear');
-    set('solution-instruction',maneuver?'Moving…':keys.size||touches.size?'Manual movement…':plan?'Suggested: '+(plan.distance/10).toFixed(2)+' km '+vectorName(plan.delta):safe?'No move needed':avoidanceSearch?'Searching for ≥1h clear…':ended?'Impact':'Checking escape routes…');
+    set('solution-instruction',maneuver?'Moving…':keys.size||touches.size?'Manual movement…':plan?'Suggested: '+(plan.distance/10).toFixed(2)+' km '+vectorName(plan.delta):safe?'No move needed':avoidanceSearch?'Searching for ≥4h clear…':ended?'Impact':'Checking escape routes…');
     set('clearance-value',plan?(plan.clearance/10).toFixed(2)+' km':'—');
     set('after-value',plan?P.briefTime(Math.max(0,plan.nextImpact-(elapsed-planAt)-(maneuver?.remaining??plan.duration))):'—');
     $('execute-button').disabled=phase!==0||!plan||ended||!!maneuver||keys.size>0||touches.size>0;
@@ -234,7 +237,7 @@
   function openDialog(mode){
     if(ended&&mode!=='lost')return;
     if(!dialog)focusBefore=document.activeElement;
-    advance(performance.now());
+    advance();
     const held=keys.size||touches.size;clearInput();
     if(held&&!ended)forecast();
     // Help is an overlay; flight and an executing maneuver continue underneath.
@@ -266,7 +269,7 @@
       if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}return;
     }
     if(e.target.matches('input,textarea,select'))return;
-    if(movementCodes.has(e.code)){e.preventDefault();if(!dialog&&!ended){advance(performance.now());manualStart();keys.add(e.code);paintKeys();}return;}
+    if(movementCodes.has(e.code)){e.preventDefault();if(!dialog&&!ended){advance();if(ended)return;manualStart();keys.add(e.code);paintKeys();}return;}
     if(e.repeat)return;
     if(e.code==='Space'&&e.target.closest('button,a'))return;
     if(e.code==='Space'){e.preventDefault();return;}
@@ -274,24 +277,25 @@
     if(e.code==='KeyH'&&!dialog)openDialog('help');
     if(e.code==='KeyL'&&!dialog){board.trackNext();setPhase(0);}
   });
-  document.addEventListener('keyup',e=>{if(keys.has(e.code)){advance(performance.now());keys.delete(e.code);if(!keys.size&&!touches.size&&!ended)forecast();paintKeys();}});
+  document.addEventListener('keyup',e=>{if(keys.has(e.code)){advance();keys.delete(e.code);if(!keys.size&&!touches.size&&!ended)forecast();paintKeys();}});
   document.querySelectorAll('[data-direction]').forEach(button=>{
     button.addEventListener('pointerdown',e=>{
-      e.preventDefault();if(dialog||ended)return;advance(performance.now());manualStart();button.setPointerCapture(e.pointerId);touches.set(e.pointerId,button.dataset.direction);paintKeys();
+      e.preventDefault();if(dialog||ended)return;advance();if(ended)return;manualStart();button.setPointerCapture(e.pointerId);touches.set(e.pointerId,button.dataset.direction);paintKeys();
     });
-    const release=e=>{if(touches.has(e.pointerId)){advance(performance.now());touches.delete(e.pointerId);if(!keys.size&&!touches.size&&!ended)forecast();paintKeys();}};
+    const release=e=>{if(touches.has(e.pointerId)){advance();touches.delete(e.pointerId);if(!keys.size&&!touches.size&&!ended)forecast();paintKeys();}};
     button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
     button.addEventListener('contextmenu',e=>e.preventDefault());
   });
-  function releaseFocus(){advance(performance.now());const held=keys.size||touches.size;clearInput();if(held&&!ended)forecast();}
+  function releaseFocus(){advance();const held=keys.size||touches.size;clearInput();if(held&&!ended)forecast();}
   window.addEventListener('blur',releaseFocus);
-  window.addEventListener('focus',()=>advance(performance.now()));
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseFocus();else advance(performance.now());saveRun();});
-  window.addEventListener('pagehide',()=>{advance(performance.now());saveRun();});
+  window.addEventListener('focus',()=>advance());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseFocus();else advance();saveRun();});
+  window.addEventListener('pagehide',()=>{releaseFocus();saveRun();});
+  window.addEventListener('pageshow',()=>{advance();renderUI();saveRun();});
   function saveRun(){
     if(!rocks.length)return;
     try{
-      localStorage.setItem(SAVE_KEY,JSON.stringify({version:1,savedAt:Date.now(),elapsed,aliveElapsed,ended,player:{...player},rocks,maneuver,heading,distanceAnchor:board.distanceAnchor}));
+      localStorage.setItem(SAVE_KEY,JSON.stringify({version:1,savedAt:lastNow,elapsed,aliveElapsed,ended,player:{...player},rocks,maneuver,heading,distanceAnchor:board.distanceAnchor}));
       storageOK=true;lastSave=performance.now();
     }catch(_){storageOK=false;}
   }
@@ -304,18 +308,19 @@
       // Older saves already record time survived in the current flight.
       aliveElapsed=Number.isFinite(saved.aliveElapsed)&&saved.aliveElapsed>=0?saved.aliveElapsed:saved.elapsed;
       heading=Number.isFinite(saved.heading)?P.wrap(saved.heading,Math.PI*2):0;
+      lastNow=Date.now();
       forecast();
       board.restoreDistance(saved.distanceAnchor,snapshot());
       if(saved.maneuver&&vector(saved.maneuver.velocity)&&P.length(saved.maneuver.velocity)<=8.01&&saved.maneuver.remaining>0&&saved.maneuver.remaining<=Math.hypot(SIZE.x,SIZE.y)/16)maneuver=saved.maneuver;
       if(saved.ended){ended=true;collisionAt=elapsed;plan=null;openDialog('lost');}
       else{
         // Old paused saves resume here without retroactively simulating their paused time.
-        let away=saved.paused?0:Math.max(0,(Date.now()-saved.savedAt)/1000);
+        let away=saved.paused?0:Math.max(0,(lastNow-saved.savedAt)/1000);
         if(maneuver){const used=advanceTravel(Math.min(away,maneuver.remaining),maneuver.velocity);away-=used;if(maneuver){maneuver.remaining-=used;if(maneuver.remaining<1e-7)maneuver=null;}if(!ended)forecast();}
         if(!ended)idle(away);
         if(!ended)forecast();
       }
-      lastNow=performance.now();return true;
+      return true;
     }catch(_){return false;}
   }
   function snapshot(){return {dimensions:2,size:SIZE,player:{...player},shipVelocity:maneuver?{...maneuver.velocity}:direction(),rocks,elapsed,timeToImpact:timeLeft(),threat,plan,maneuver,heading,generation,phase,searching:!!avoidanceSearch,paused:false,ended};}
@@ -323,7 +328,7 @@
     requestAnimationFrame(frame);
     const active=keys.size||touches.size||maneuver||phase!==board.state?.phase||board.distanceHover!==board.renderedHover||Math.abs((board.shipHeading||0)-(board.turnTarget||0))>1e-5;
     if(document.hidden||now-lastFrame<(active?30:100))return;
-    advance(now);
+    advance();
     lastFrame=now;
     board.update(snapshot(),now);
     if(now-lastUI>120){renderUI();lastUI=now;}
@@ -335,7 +340,7 @@
   document.addEventListener('pointerdown',unlockAudio,{capture:true,passive:true});
   document.addEventListener('keydown',unlockAudio,{capture:true});
   renderUI();board.update(snapshot(),performance.now());
-  setInterval(()=>{if(document.hidden){advance(performance.now());renderUI();}},250);
+  setInterval(()=>{if(document.hidden){advance();renderUI();}},250);
   requestAnimationFrame(frame);
   window.STILL=Object.freeze({getState:()=>({...snapshot(),aliveSeconds:aliveSeconds(),nextThreat:threat?.id??null,asteroids:rocks.length,shipRadius:P.SHIP_RADIUS,worldSize:SIZE,generation,dialog,sound:audio.enabled,board:board.getState(),lastExecutedPlan,watch:{alertCount,audioState:audio.context?.state||'unarmed'}})});
 })();

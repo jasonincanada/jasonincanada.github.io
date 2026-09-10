@@ -9,16 +9,25 @@
   function line(c,a,b,color,width=1,dash=[]){c.beginPath();c.setLineDash(dash);c.lineWidth=width;c.strokeStyle=color;c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.setLineDash([]);}
   function ring(c,p,r,color,width=1){c.beginPath();c.arc(p.x,p.y,Math.max(.1,r),0,Math.PI*2);c.strokeStyle=color;c.lineWidth=width;c.stroke();}
   function text(c,label,x,y,color,size=8,align='left'){c.fillStyle=color;c.font=(size<=7?12:size<=8?14:size<=9?16:size)+'px FlightMono, "Courier New", Courier, monospace';c.textAlign=align;c.textBaseline='middle';c.fillText(label,x,y);}
-  function fieldPopup(c,p,label,details,w,top,mapH){
+  function fieldPopup(c,p,label,details,w,top,mapH,avoid=[]){
     c.font='16px FlightMono, "Courier New", Courier, monospace';const labelWidth=c.measureText(label).width;
     c.font='12px FlightMono, "Courier New", Courier, monospace';
     const boxW=Math.ceil(Math.max(labelWidth,...details.map(value=>c.measureText(value).width)))+16,boxH=30+18*details.length;
-    const lx=p.x>w*.58?p.x-boxW-26:p.x+32;
-    const x=Math.max(4,Math.min(w-boxW-4,lx)),y=Math.max(top+4,Math.min(top+mapH-boxH-4,p.y+25));
-    line(c,p,{x:x+(lx<p.x?boxW-8:8),y:y+boxH/2},C.blue+'90');
+    const sides=p.x>w*.58?[p.x-boxW-32,p.x+32]:[p.x+32,p.x-boxW-32];
+    const candidates=sides.flatMap(x=>[p.y+25,p.y-boxH-25,p.y-boxH/2].map(y=>({x,y})));
+    candidates.push({x:p.x-boxW/2,y:p.y-boxH-32},{x:p.x-boxW/2,y:p.y+32});
+    const overlap=(x,y,r)=>Math.max(0,Math.min(x+boxW,r.right)-Math.max(x,r.left))*Math.max(0,Math.min(y+boxH,r.bottom)-Math.max(y,r.top));
+    const positions=candidates.map(({x,y},order)=>{
+      x=Math.max(4,Math.min(w-boxW-4,x));y=Math.max(top+4,Math.min(top+mapH-boxH-4,y));
+      return {x,y,score:avoid.reduce((sum,r)=>sum+overlap(x,y,r)*(r.weight||1),0),order};
+    });
+    positions.sort((a,b)=>a.score-b.score||a.order-b.order);
+    const {x,y}=positions[0];
+    line(c,p,{x:Math.max(x,Math.min(x+boxW,p.x)),y:Math.max(y,Math.min(y+boxH,p.y))},C.blue+'90');
     c.fillStyle='#1e3040';c.fillRect(x,y,boxW,boxH);
     text(c,label,x+8,y+14,C.blue,9);
     details.forEach((value,i)=>text(c,value,x+8,y+35+i*18,'#b4cadd',7));
+    return {left:x-6,right:x+boxW+6,top:y-6,bottom:y+boxH+6,weight:100};
   }
   function labelClear(c,label,x,y,pixels,align,circles){
     c.font=pixels+'px FlightMono, "Courier New", Courier, monospace';
@@ -245,6 +254,7 @@
         }
       }
       c.restore();
+      const popups=[];
       for(const asteroid of s.rocks){
         const offset=relative({x:asteroid.position.x+asteroid.velocity.x*future,y:asteroid.position.y+asteroid.velocity.y*future}),p=project(offset);
         const danger=asteroid===s.threat,r=Math.max(6,asteroid.radius*scale);
@@ -260,15 +270,20 @@
           const label=s.phase>.995?'IMPACT / '+idOf(asteroid):idOf(asteroid);
           const detail=s.phase>.995?'IF STATIONARY':P.briefTime(s.timeToImpact);
           const metrics=(P.length(offset)/10).toFixed(2)+' km · '+(P.length(asteroid.velocity)*360).toFixed(2)+' km/h';
-          fieldPopup(c,p,label,[detail,metrics],w,top,mapH);
+          popups.push({p,label,details:[detail,metrics]});
         }
         if(asteroid.id===this.hovered&&!danger){
           ring(c,p,12,C.blue);
           const metrics=(P.length(offset)/10).toFixed(2)+' km · '+(P.length(asteroid.velocity)*360).toFixed(2)+' km/h';
-          fieldPopup(c,p,idOf(asteroid),[metrics],w,top,mapH);
+          popups.push({p,label:idOf(asteroid),details:[metrics]});
         }
         this.hits.push({...p,id:asteroid.id,radius:danger?Math.max(25,r+19):r});
       }
+      // Keep callouts clear of the ship, its labels, and other callouts. Draw
+      // them after the rocks so later asteroid strokes cannot cross the text.
+      const avoid=[{left:origin.x-60,right:origin.x+24,top:origin.y-30,bottom:origin.y+(s.maneuver?42:18),weight:100},
+        ...this.hits.map(p=>({left:p.x-p.radius-6,right:p.x+p.radius+6,top:p.y-p.radius-6,bottom:p.y+p.radius+6}))];
+      for(const popup of popups)avoid.push(fieldPopup(c,popup.p,popup.label,popup.details,w,top,mapH,avoid));
       if(this.fieldPointer)this.updateFieldHover();
       ship(c,origin,C.lime,8,false,this.shipHeading);
       if(!s.phase&&labelClear(c,'YOU',origin.x-12,origin.y-12,16,'right',this.hits)){text(c,'YOU',origin.x-12,origin.y-12,C.lime,9,'right');}
@@ -332,12 +347,12 @@
       if(body.hidden===shown)body.hidden=!shown;
       if(empty.hidden!==shown)empty.hidden=shown;
       $('live-passes-scale').hidden=!shown;
-      const nearest=contacts.slice(0,3),summary=nearest.map(p=>idOf(p)+' '+p.clearance.toFixed(2)+' km '+p.motion).join('|');
+      const nearest=contacts.slice(0,3),summary=nearest.map(p=>idOf(p)+' '+p.clearance.toFixed(3)+' km '+p.motion).join('|');
       if(summary!==this.liveSummary){
         this.liveSummary=summary;
         $('live-passes-list').replaceChildren(...nearest.map(p=>{
           const row=document.createElement('div');row.className='live-pass';
-          const label=document.createElement('strong');label.textContent=idOf(p)+' · '+p.clearance.toFixed(2)+' km';
+          const label=document.createElement('strong');label.textContent=idOf(p)+' · '+p.clearance.toFixed(3)+' km';
           const motion=document.createElement('small');motion.textContent=p.motion;
           row.append(label,motion);return row;
         }));
@@ -382,7 +397,7 @@
         c.beginPath();c.arc(at.x,at.y,1.4,0,Math.PI*2);c.fillStyle=color;c.fill();
         if(nearest.includes(p))text(c,String(p.id+1).padStart(2,'0'),Math.max(9,Math.min(w-9,at.x)),Math.max(7,Math.min(h-7,at.y-p.radius*scale-7)),color,7,'center');
       }
-      this.liveCanvas.setAttribute('aria-label',(preview?'Projected positions at '+Math.round(future)+' seconds from now':'Live positions')+', fixed '+viewRange/10+' kilometer outer ring with faint rings at 2 and 1 kilometers, up is positive Y. Dashed trajectories extend backward and forward across the rectangular view. Arrowheads at both ends indicate the direction of motion. Collision circles are drawn to scale. '+nearest.map(p=>idOf(p)+': '+p.clearance.toFixed(2)+' kilometers edge clearance, '+p.motion.toLowerCase()).join('. '));
+      this.liveCanvas.setAttribute('aria-label',(preview?'Projected positions at '+Math.round(future)+' seconds from now':'Live positions')+', fixed '+viewRange/10+' kilometer outer ring with faint rings at 2 and 1 kilometers, up is positive Y. Dashed trajectories extend backward and forward across the rectangular view. Arrowheads at both ends indicate the direction of motion. Collision circles are drawn to scale. '+nearest.map(p=>idOf(p)+': '+p.clearance.toFixed(3)+' kilometers edge clearance, '+p.motion.toLowerCase()).join('. '));
     }
     drawDistance(s){
       const {c,w,h}=prepare(this.distanceCanvas);
